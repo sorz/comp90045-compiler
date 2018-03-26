@@ -1,0 +1,47 @@
+program miscTest;
+
+var
+id: integer;
+f: boolean;
+
+procedure boo;
+    var
+        a: array [3..4] of integer;
+        b: array [5..23] of integer;
+begin
+    while b[5] >= 0 do read(a[4])
+end;
+
+procedure foo (k: real);
+  var ifigenia: integer;        t: boolean;
+begin
+  ifigenia := 4+ 5 - 9 *(-1 + 3)
+end;
+
+procedure goo (var q: boolean;
+         var m: integer;
+         n: real);
+        var arr: array [9..2] of real;
+        {ranges not in order, but we don't test that yet}
+        matrix: array [0..4] of integer;
+begin
+if m - 2 < 3 *8 then matrix[2] := 7
+end;
+
+begin
+
+id := 5 * 2 + 1;
+f := not (false and true) or false;
+read(f);
+write('strings allowed in write');
+
+        if f <> false then
+        begin
+        id:= (((9 - 1))) * 3;
+        f := not false
+        end
+        else f:= true or true;
+
+{some procedure calls}
+boo ; foo(1.08) ; goo(true, 55, 90058.783)
+end.

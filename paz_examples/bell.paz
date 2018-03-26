@@ -1,0 +1,31 @@
+program bell;
+
+var
+    n: integer; 
+    result: integer;
+
+procedure bell(n: integer; m: integer; var out: integer);
+var
+    resA: integer;
+    resB: integer;
+begin
+    if m = 0 then
+        if n = 0 then
+           out := 1
+        else 
+           bell(n - 1, n - 1, out)
+    else begin
+        bell(n, m - 1, resA);
+        bell(n - 1, m - 1, resB);
+        out := resA + resB
+    end
+end;
+
+begin
+    write('Type integer n: ');
+    read(n);
+    bell(n, 0, result);
+    write('Bell(n) is: ');
+    writeln(result)
+end.
+

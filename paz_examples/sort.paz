@@ -1,0 +1,40 @@
+program sort;
+
+    var h: integer;
+        j: integer;
+        v: integer;
+        x: array [1..8] of integer;
+
+begin
+    write('Provide 8 integers: ');
+    read(x[1]);
+    read(x[2]);
+    read(x[3]);
+    read(x[4]);
+    read(x[5]);
+    read(x[6]);
+    read(x[7]);
+    read(x[8]);
+    
+    for h := 2 to 8 do
+    begin
+        v := x[h];
+        j := h-1;
+        while (j > 0) and (v < x[j]) do
+        begin
+            x[j+1] := x[j];
+            j := j-1
+        end;
+        x[j+1] := v
+    end;
+    { Finished sorting, now print result }
+    write('\nThe integers, sorted:\n\n');
+    h := 1;
+    for h := 1 to 8 do
+    begin
+        write(x[h]);
+        write('  ')
+    end;
+    writeln('')
+end.
+

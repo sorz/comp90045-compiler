@@ -1,0 +1,32 @@
+program fib;
+
+{ Prompts for n, then prints the nth fibonacci number }
+
+{ Procedure fib computes the nth fibonacci number. }
+{ The result is returned in out. }
+
+var
+    n: integer;
+    m: integer;
+
+procedure fib(n: integer; var out: integer);
+var
+    f1: integer;
+    f2: integer;
+
+begin
+    if n <= 1 then
+        out := n
+    else begin
+        fib(n - 2, f1);
+        fib(n - 1, f2);
+        out := f1 + f2
+    end
+end;
+
+begin
+    write('>');
+    read(n);
+    fib(n, m);
+    writeln(m)
+end.

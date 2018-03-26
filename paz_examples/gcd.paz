@@ -1,0 +1,47 @@
+{ Greatest common divisor of two positive integers
+  using a variant of Euclid's method }
+
+program euclid;
+
+var
+    x: integer;
+    y: integer;
+    temp: integer;
+    quotient: integer;
+    remainder: integer;
+
+begin
+    write('Input a positive integer: ');
+    read(x);
+    write('And another positive integer: ');
+    read(y);
+
+    writeln('');
+
+    if x < y then
+    begin
+        temp := x;
+        x := y;
+        y := temp
+    end;
+
+    write('The gcd of ');
+    write(x);
+    write(' and ');
+    write(y);
+    write(' is ');
+
+    quotient := x div y;
+    remainder := x - quotient * y;
+
+    while remainder > 0 do 
+    begin
+        x := y;
+        y := remainder;
+        quotient := x div y;
+        remainder := x - quotient * y
+    end;
+
+    writeln(y)
+end.
+

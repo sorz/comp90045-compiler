@@ -1,0 +1,8 @@
+program Quadratic;
+
+var
+   A,B,C,D: integer;
+
+begin
+   D := B*B-4*A*C;
+end.
