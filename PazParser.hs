@@ -10,7 +10,10 @@ import Text.Parsec (
     optional,
     parse,
     tokenPrim,
-    try
+    try,
+    (<|>),
+    sepBy1,
+    lookAhead
     )
 import Data.Char
 import Data.Map (Map)
@@ -640,7 +643,7 @@ parseProcedureDeclarationPart =
 -- the dummy implementation simply scans and skips tokens between BEGIN and
 -- END (it also skips anything that looks like a nested BEGIN and END block)
 
-type ASTCompoundStatement = ()
+type ASTCompoundStatement = ASTStatementSequence
 parseCompoundStatement :: Parser ASTCompoundStatement
 parseCompoundStatement =
     trace
@@ -648,35 +651,366 @@ parseCompoundStatement =
         (
             do
                 parseTokenBegin
-                many (
-                    try (
-                        parseSkipLexicalToken
-                        )
-                    )
+                s <- parseStatementSequence
                 parseTokenEnd
+                return s
             )
 
-type ASTSkipLexicalToken = ()
-parseSkipLexicalToken :: Parser ASTSkipLexicalToken
-parseSkipLexicalToken =
+type ASTStatementSequence = [ASTStatement]
+parseStatementSequence :: Parser ASTStatementSequence
+parseStatementSequence =
     trace
-        "parseSkipLexicalToken"
-        (
-            choice
-                [
-                    try (
-                        parseCompoundStatement
-                        ),
-                    void (
-                        satisfy (
-                            \x ->
-                                case x of
-                                    LTEnd -> False
-                                    _ -> True
-                            )
-                        )
-                    ]
+        "parseStatementSequence"
+        sepBy1 parseStatement parseTokenSemicolon
+
+type ASTStatement = Statement
+data Statement = 
+    AssignmentStatement ASTAssignmentStatement |
+    ProcedureStatement ASTProcedureStatement |
+    CompoundStatement ASTCompoundStatement |
+    IfStatement ASTIfStatement |
+    WhileStatement ASTWhileStatement |
+    ForStatement ASTForStatement |
+    EmptyStatement ASTEmptyStatement
+    deriving Show
+parseStatement :: Parser ASTStatement
+parseStatement =
+    trace
+    "parseStatement"
+    (
+        try (do
+            x <- parseAssignmentStatement
+            return (AssignmentStatement x)
+            ) <|>
+        try (do
+            x <- parseProcedureStatement
+            return (ProcedureStatement x)
+            ) <|>
+        try (do
+            x <- parseCompoundStatement
+            return (CompoundStatement x)
+            ) <|>
+        try (do
+            x <- parseIfStatement
+            return (IfStatement x)
+            ) <|>
+        try (do
+            x <- parseWhileStatement
+            return (WhileStatement x)
+            ) <|>
+        try (do
+            x <- parseForStatement
+            return (ForStatement x)
+            ) <|>
+        do
+            x <- parseEmptyStatement
+            return (EmptyStatement x)
+        )
+
+type ASTEmptyStatement = ()
+parseEmptyStatement :: Parser ASTEmptyStatement
+parseEmptyStatement =
+    trace
+        "parseEmptyStatement"
+        lookAhead (parseTokenEnd <|> parseTokenDot)
+
+type ASTAssignmentStatement = (AssignmentLeft, ASTExpression)
+data AssignmentLeft =
+    AssignVariableAccess ASTVariableAccess |
+    AssignIdentifier ASTIdentifier
+    deriving Show
+parseAssignmentStatement :: Parser ASTAssignmentStatement
+parseAssignmentStatement =
+    trace
+        "parseExpression"
+        (do
+            x0 <- choice [
+                try (do
+                    y <- parseVariableAccess
+                    return (AssignVariableAccess y)
+                    ),
+                do
+                    y <- parseIdentifier
+                    return (AssignIdentifier y)
+                ]
+            parseTokenAssign
+            x1 <- parseExpression
+            return (x0, x1)
+        )
+
+type ASTIfStatement = (ASTExpression, ASTStatement, Maybe ASTStatement)
+parseIfStatement :: Parser ASTIfStatement
+parseIfStatement =
+    trace
+        "parseIfStatement"
+        (do
+            parseTokenIf
+            x0 <- parseExpression
+            parseTokenThen
+            x1 <- parseStatement
+            x2 <- optionMaybe (try (do
+                parseTokenElse
+                parseStatement
+                ))
+            return (x0, x1, x2)
             )
+
+type ASTProcedureStatement = (ASTIdentifier, Maybe ASTActualParameterList)
+parseProcedureStatement :: Parser ASTProcedureStatement
+parseProcedureStatement =
+    trace
+        "parseProcedureStatement"
+        (do
+            x0 <- parseIdentifier
+            x1 <- optionMaybe (try (parseActualParameterList))
+            return (x0, x1)
+            )
+
+type ASTActualParameterList = [ASTExpression]
+parseActualParameterList :: Parser ASTActualParameterList
+parseActualParameterList =
+    trace
+        "parseActualParameterList"
+        (do
+            parseTokenLeftParenthesis
+            x <- sepBy1 parseExpression parseTokenComma
+            parseTokenRightParenthesis
+            return x
+            )
+
+
+type ASTForStatement = (ASTIdentifier, ASTExpression, ForDirection, ASTExpression, ASTStatement)
+data ForDirection =
+    ForTo | ForDownTo
+    deriving Show
+parseForStatement :: Parser ASTForStatement
+parseForStatement =
+    trace
+        "parseForStatement"
+        (do
+            parseTokenFor
+            x0 <- parseIdentifier
+            parseTokenAssign
+            x1 <- parseExpression
+            x2 <-
+                (parseTokenTo >> return ForTo) <|>
+                (parseTokenDownTo >> return ForDownTo)
+            x3 <- parseExpression
+            parseTokenDo
+            x4 <- parseStatement
+            return (x0, x1, x2, x3, x4)
+            )
+
+type ASTWhileStatement = (ASTExpression, ASTStatement)
+parseWhileStatement :: Parser ASTWhileStatement
+parseWhileStatement =
+    trace
+        "parseWhileStatement"
+        (do
+            parseTokenWhile
+            x0 <- parseExpression
+            parseTokenDo
+            x1 <- parseStatement
+            return (x0, x1)
+            )
+
+
+-- Expression section
+
+type ASTExpression = (ASTSimpleExpression, Maybe (ASTRelationalOperator, ASTSimpleExpression))
+parseExpression :: Parser ASTExpression
+parseExpression = 
+    trace
+        "parseExpression"
+        (do 
+            x0 <- parseSimpleExpression
+            x1 <- optionMaybe (try (do
+                    y0 <- parseRelationalOperator
+                    y1 <- parseSimpleExpression
+                    return (y0, y1)
+                ))
+            return (x0, x1)
+            )
+
+type ASTRelationalOperator = RelationalOperator
+data RelationalOperator =
+    Equal | NotEqual | LessThan | GreaterThan | LessThanOrEqual | GreaterThanOrEqual
+    deriving Show
+parseRelationalOperator :: Parser ASTRelationalOperator
+parseRelationalOperator =
+    trace
+        "parseRelationalOperator"
+        (
+            (parseTokenEqual >> return Equal) <|>
+            (parseTokenNotEqual >> return NotEqual) <|>
+            (parseTokenLessThan >> return LessThan) <|>
+            (parseTokenGreaterThan >> return GreaterThan) <|>
+            (parseTokenLessThanOrEqual >> return LessThanOrEqual) <|>
+            (parseTokenGreaterThanOrEqual >> return GreaterThanOrEqual)
+        )
+
+type ASTSimpleExpression = (Maybe Sign, ASTTerm, [(ASTAddingOperator, ASTTerm)])
+parseSimpleExpression :: Parser ASTSimpleExpression
+parseSimpleExpression =
+    trace
+        "parseSimpleExpression"
+        (do
+            x0 <- optionMaybe (try parseSign)
+            x1 <- parseTerm
+            x2 <- many (
+                try (
+                    do
+                        y0 <- parseAddingOperator
+                        y1 <- parseTerm
+                        return (y0, y1)
+                    )
+                )
+            return (x0, x1, x2)
+            )
+
+type ASTAddingOperator = AddingOperator
+data AddingOperator = 
+    Plus | Minus | Or
+    deriving Show
+parseAddingOperator :: Parser ASTAddingOperator
+parseAddingOperator =
+    trace
+        "parseAddingOperator"
+        (
+            (parseTokenPlus >> return Plus) <|>
+            (parseTokenMinus >> return Minus) <|>
+            (parseTokenOr >> return Or)
+        )
+
+type ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
+parseTerm :: Parser ASTTerm
+parseTerm =
+    trace
+        "parseTerm"
+        (do
+            x0 <- parseFactor
+            x1 <- many (
+                try (do
+                    y0 <- parseMutiplyingOperator
+                    y1 <- parseFactor
+                    return (y0, y1)
+                    )
+                )
+            return (x0, x1)
+        )
+
+type ASTMutiplayingOperator = MutiplayingOperator
+data MutiplayingOperator = 
+    Times | DivideBy | Div | And
+    deriving Show
+parseMutiplyingOperator :: Parser ASTMutiplayingOperator
+parseMutiplyingOperator =
+    trace
+        "parseAddingOperator"
+        (
+            (parseTokenTimes >> return Times) <|>
+            (parseTokenDivideBy >> return DivideBy) <|>
+            (parseTokenDiv >> return Div) <|>
+            (parseTokenAnd >> return And)
+        )
+
+type ASTFactor = Factor
+data Factor =
+    UnsignedConstant ASTUnsignedConstant |
+    VariableAccess ASTVariableAccess |
+    Expression ASTExpression |
+    NotFactor ASTFactor
+    deriving Show
+parseFactor :: Parser ASTFactor
+parseFactor =
+    trace
+        "parseFactor"
+        (
+            try (do
+                x <- parseUnsignedConstant
+                return (UnsignedConstant x)
+                ) <|>
+            try (do
+                x <- parseVariableAccess
+                return (VariableAccess x)
+                ) <|>
+            try (do
+                parseTokenLeftParenthesis
+                x <- parseExpression
+                parseTokenRightParenthesis
+                return (Expression x)
+                ) <|>
+            do
+                parseTokenNot
+                x <- parseFactor
+                return (NotFactor x)
+        )
+
+type ASTVariableAccess = VariableAccess
+data VariableAccess =
+    IndexedVariable ASTIndexedVariable |
+    Identifier ASTIdentifier
+    deriving Show
+parseVariableAccess :: Parser ASTVariableAccess
+parseVariableAccess =
+    trace
+        "parseVariableAccess"
+        try (do
+            x <- parseIndexedVariable
+            return (IndexedVariable x)
+            )
+        <|> do
+            x <- parseIdentifier
+            return (Identifier x)
+
+type ASTIndexedVariable = (ASTIdentifier, ASTExpression)
+parseIndexedVariable :: Parser ASTIndexedVariable
+parseIndexedVariable =
+    trace
+        "parseIndexedVariable"
+        (do
+            x0 <- parseIdentifier
+            parseTokenLeftBracket
+            x1 <- parseExpression
+            parseTokenRightBracket
+            return (x0, x1)
+            )
+
+type ASTUnsignedNumber = UnsignedNumber
+data UnsignedNumber =
+    UnsignedInteger ASTUnsignedInteger |
+    UnsignedReal ASTUnsignedReal
+    deriving Show
+parseUnsignedNumber :: Parser ASTUnsignedNumber
+parseUnsignedNumber =
+    trace
+        "parseUnsignedNumber"
+        try (do
+            x <- parseUnsignedInteger
+            return (UnsignedInteger x)
+            )
+        <|> do
+            x <- parseUnsignedReal
+            return (UnsignedReal x)
+
+type ASTUnsignedConstant = UnsignedConstant
+data UnsignedConstant =
+    UnsignedNumber ASTUnsignedNumber |
+    CharacterString ASTCharacterString
+    deriving Show
+parseUnsignedConstant :: Parser ASTUnsignedConstant
+parseUnsignedConstant =
+    trace
+        "parseUnsignedConstant"
+        try (do
+            x <- parseUnsignedNumber
+            return (UnsignedNumber x)
+            )
+        <|> do
+            x <- parseCharacterString
+            return (CharacterString x)
+
+
 
 -- your code ends here
 
