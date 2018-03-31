@@ -13,6 +13,7 @@ import Text.Parsec (
     try,
     (<|>),
     sepBy1,
+    endBy1,
     lookAhead
     )
 import Data.Char
@@ -1112,32 +1113,18 @@ parseIdentifierList =
                 return (x0, x1)
             )
 
-type ASTVariableDeclarationPart = (Maybe (ASTVariableDeclaration, [ASTVariableDeclaration]))
+type ASTVariableDeclarationPart = [ASTVariableDeclaration]
 parseVariableDeclarationPart :: Parser ASTVariableDeclarationPart
 parseVariableDeclarationPart =
     trace
         "parseVariableDeclarationPart"
         (
-            optionMaybe (
-                try (
-                    do
-                        parseTokenVar
-                        x0 <-
-                            parseVariableDeclaration
-                        parseTokenSemicolon
-                        x1 <-
-                            many (
-                                try (
-                                    do
-                                        x0 <-
-                                            parseVariableDeclaration
-                                        parseTokenSemicolon
-                                        return x0
-                                    )
-                                )
-                        return (x0, x1)
-                    )
-                )
+            try (
+                do
+                    parseTokenVar
+                    endBy1 parseVariableDeclaration parseTokenSemicolon
+                ) <|>
+                return []
             )
 
 type ASTVariableDeclaration = (ASTIdentifierList, ASTTypeDenoter)
