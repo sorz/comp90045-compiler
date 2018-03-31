@@ -66,4 +66,4 @@ prettyPrint file = do
         LexcialError _ -> die (show result)
         SyntaxError _ -> die (show result)
         Ok ast ->
-            putStrLn (PazFormat.formatAST ast)
+            putStrLn (PazFormat.showProgram ast)
