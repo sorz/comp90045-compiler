@@ -7,6 +7,7 @@ import PazParser (
     ASTVariableDeclarationPart,
     ASTProcedureDeclarationPart,
     ASTCompoundStatement,
+    ASTVariableDeclaration,
     )
 
 -- Generate formatted source code of whole program from AST.
@@ -24,8 +25,21 @@ showIdentifier :: ASTIdentifier -> String
 showIdentifier name =
     "program " ++ name ++ ";\n\n"
 
+-- ASTVariableDeclarationPart = [ASTVariableDeclaration]
 showVariableDeclarationPart :: ASTVariableDeclarationPart -> String
-showVariableDeclarationPart = show -- TODO
+showVariableDeclarationPart [] = ""
+showVariableDeclarationPart xs =
+    "var\n" ++ (showVariableDeclarationPart' xs)
+
+showVariableDeclarationPart' :: ASTVariableDeclarationPart -> String
+showVariableDeclarationPart' [] = ""
+showVariableDeclarationPart' (x:xs) =
+    "    " ++ (showASTVariableDeclaration x) ++ "\n"
+    ++ showVariableDeclarationPart' xs
+
+-- ASTVariableDeclaration = (ASTIdentifierList, ASTTypeDenoter)
+showASTVariableDeclaration :: ASTVariableDeclaration -> String
+showASTVariableDeclaration = show -- TODO
 
 showProcedureDeclarationPart :: ASTProcedureDeclarationPart -> String
 showProcedureDeclarationPart = show -- TODO
