@@ -4,8 +4,7 @@
 module PazFormat where
 import PazLexer (
     ASTIdentifier,
-    ASTSign,
-    Sign(..),
+    ASTUnsignedInteger,
     )
 import PazParser (
     ASTProgram,
@@ -19,6 +18,8 @@ import PazParser (
     ASTArrayType,
     ASTConstant,
     ASTSubrangeType,
+    ASTSign,
+    Sign(..),
     TypeDenoter(..),
     TypeIdentifier(..),
     )
@@ -86,7 +87,17 @@ instance PrettyPrint ASTSubrangeType where
         (prettyPrint const1) ++ ".." ++ (prettyPrint const2)
 
 instance PrettyPrint ASTConstant where
-    prettyPrint = show -- TODO
+    prettyPrint (Nothing, n) = prettyPrint n
+    prettyPrint ((Just sign), n) =
+        (prettyPrint sign) ++ (prettyPrint n)
+
+instance PrettyPrint ASTUnsignedInteger where
+    prettyPrint = show
+
+instance PrettyPrint ASTSign where
+    prettyPrint SignPlus = "+"
+    prettyPrint SignMinus = "-"
+
 
 instance PrettyPrint ASTProcedureDeclarationPart where
     prettyPrint = show -- TODO
