@@ -569,13 +569,14 @@ parseIdentifier =
                 return (x0 : x1)
             )
 
-type ASTUnsignedInteger = ASTDigitSequence
+type ASTUnsignedInteger = Integer
 parseUnsignedInteger :: Parser ASTUnsignedInteger
 parseUnsignedInteger =
     trace
         "parseUnsignedInteger"
-        (
-            parseDigitSequence
+        (do
+            x <- parseDigitSequence
+            return (read x :: Integer)
             )
 
 type ASTDigitSequence = [ASTDigit]
