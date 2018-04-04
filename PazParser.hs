@@ -1091,27 +1091,12 @@ parseFormalParameterSection =
                     )
             )
 
-type ASTIdentifierList = (ASTIdentifier, [ASTIdentifier])
+type ASTIdentifierList = [ASTIdentifier]
 parseIdentifierList :: Parser ASTIdentifierList
 parseIdentifierList =
     trace
         "parseIdentifierList"
-        (
-            do
-                x0 <-
-                    parseIdentifier
-                x1 <-
-                    many (
-                        try (
-                            do
-                                parseTokenComma
-                                x0 <-
-                                    parseIdentifier
-                                return x0
-                            )
-                        )
-                return (x0, x1)
-            )
+        try (sepBy1 parseIdentifier parseTokenComma)
 
 type ASTVariableDeclarationPart = [ASTVariableDeclaration]
 parseVariableDeclarationPart :: Parser ASTVariableDeclarationPart
