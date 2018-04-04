@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module PazFormat where
 import PazLexer (
     ASTIdentifier,
@@ -14,51 +17,54 @@ import PazParser (
     ASTArrayType,
     )
 
+class PrettyPrint ast where
+    prettyPrint :: ast -> String
+
 -- Generate formatted source code of whole program from AST.
 -- ASTProgram =
 --   (ASTIdentifier, ASTVariableDeclarationPart,
 --    ASTProcedureDeclarationPart, ASTCompoundStatement)
-showProgram :: ASTProgram -> String
-showProgram (id, variable, procedure, statement) =
-    (showIdentifier id) ++
-    (showVariableDeclarationPart variable) ++
-    (showProcedureDeclarationPart procedure) ++
-    (showCompoundStatement statement)
+instance PrettyPrint ASTProgram where
+    prettyPrint (id, variable, procedure, statement) =
+        (prettyPrint id) ++
+        (prettyPrint variable) ++
+        (prettyPrint procedure) ++
+        (prettyPrint statement)
 
-showIdentifier :: ASTIdentifier -> String
-showIdentifier name =
-    "program " ++ name ++ ";\n\n"
+instance PrettyPrint ASTIdentifier where
+    prettyPrint name =
+        "program " ++ name ++ ";\n\n"
 
 -- ASTVariableDeclarationPart = [ASTVariableDeclaration]
+instance PrettyPrint ASTVariableDeclarationPart where
+    prettyPrint [] = ""
+    prettyPrint xs =
+        "var\n" ++ (showVariableDeclarationPart xs)
+
 showVariableDeclarationPart :: ASTVariableDeclarationPart -> String
 showVariableDeclarationPart [] = ""
-showVariableDeclarationPart xs =
-    "var\n" ++ (showVariableDeclarationPart' xs)
-
-showVariableDeclarationPart' :: ASTVariableDeclarationPart -> String
-showVariableDeclarationPart' [] = ""
-showVariableDeclarationPart' (x:xs) =
-    "    " ++ (showVariableDeclaration x) ++ "\n"
-    ++ showVariableDeclarationPart' xs
+showVariableDeclarationPart (x:xs) =
+    "    " ++ (prettyPrint x) ++ "\n"
+    ++ showVariableDeclarationPart xs
 
 -- ASTVariableDeclaration = (ASTIdentifierList, ASTTypeDenoter)
-showVariableDeclaration :: ASTVariableDeclaration -> String
-showVariableDeclaration (ids, typ) =
-    (showIdentifierList ids) ++ ": " ++ (showTypeDenoter typ)
+instance PrettyPrint ASTVariableDeclaration where
+    prettyPrint (ids, typ) =
+        (prettyPrint ids) ++ ": " ++ (prettyPrint typ)
 
 -- ASTIdentifierList = [ASTIdentifier]
-showIdentifierList :: ASTIdentifierList -> String
-showIdentifierList [] = ""
-showIdentifierList (x:[]) = id x
-showIdentifierList (x:xs) =
-    (id x) ++ ", " ++ (showIdentifierList xs)
+instance PrettyPrint ASTIdentifierList where
+    prettyPrint [] = ""
+    prettyPrint (x:[]) = id x
+    prettyPrint (x:xs) =
+        (id x) ++ ", " ++ (prettyPrint xs)
 
 -- ASTTypeDenoter = OrdinaryTypeDenoter | ArrayTypeDenoter
-showTypeDenoter :: ASTTypeDenoter -> String
-showTypeDenoter = show -- TODO
+instance PrettyPrint ASTTypeDenoter where
+    prettyPrint = show -- TODO
 
-showProcedureDeclarationPart :: ASTProcedureDeclarationPart -> String
-showProcedureDeclarationPart = show -- TODO
+instance PrettyPrint ASTProcedureDeclarationPart where
+    prettyPrint = show -- TODO
 
-showCompoundStatement :: ASTCompoundStatement -> String
-showCompoundStatement = show -- TODO
+instance PrettyPrint ASTCompoundStatement where
+    prettyPrint = show -- TODO

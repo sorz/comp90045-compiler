@@ -21,7 +21,7 @@ main = do
     case args of
         ["-p"] -> die usage
         [file] -> compile file
-        ["-p", file] -> prettyPrint file
+        ["-p", file] -> Main.prettyPrint file
         _ -> die usage
 
 
@@ -66,4 +66,4 @@ prettyPrint file = do
         LexcialError _ -> die (show result)
         SyntaxError _ -> die (show result)
         Ok ast ->
-            putStrLn (PazFormat.showProgram ast)
+            putStrLn (PazFormat.prettyPrint ast)
