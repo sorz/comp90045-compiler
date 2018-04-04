@@ -4,6 +4,8 @@
 module PazFormat where
 import PazLexer (
     ASTIdentifier,
+    ASTSign,
+    Sign(..),
     )
 import PazParser (
     ASTProgram,
@@ -15,6 +17,10 @@ import PazParser (
     ASTTypeDenoter,
     ASTTypeIdentifier,
     ASTArrayType,
+    ASTConstant,
+    ASTSubrangeType,
+    TypeDenoter(..),
+    TypeIdentifier(..),
     )
 
 class PrettyPrint ast where
@@ -26,14 +32,10 @@ class PrettyPrint ast where
 --    ASTProcedureDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint ASTProgram where
     prettyPrint (id, variable, procedure, statement) =
-        (prettyPrint id) ++
+        "program " ++ (prettyPrint id) ++ ";\n\n" ++
         (prettyPrint variable) ++
         (prettyPrint procedure) ++
         (prettyPrint statement)
-
-instance PrettyPrint ASTIdentifier where
-    prettyPrint name =
-        "program " ++ name ++ ";\n\n"
 
 -- ASTVariableDeclarationPart = [ASTVariableDeclaration]
 instance PrettyPrint ASTVariableDeclarationPart where
@@ -50,17 +52,40 @@ showVariableDeclarationPart (x:xs) =
 -- ASTVariableDeclaration = (ASTIdentifierList, ASTTypeDenoter)
 instance PrettyPrint ASTVariableDeclaration where
     prettyPrint (ids, typ) =
-        (prettyPrint ids) ++ ": " ++ (prettyPrint typ)
+        (prettyPrint ids) ++ ": " ++ (prettyPrint typ) ++ ";"
 
 -- ASTIdentifierList = [ASTIdentifier]
 instance PrettyPrint ASTIdentifierList where
     prettyPrint [] = ""
     prettyPrint (x:[]) = id x
     prettyPrint (x:xs) =
-        (id x) ++ ", " ++ (prettyPrint xs)
+        (prettyPrint x) ++ ", " ++ (prettyPrint xs)
+
+-- ASTIdentifier = String
+-- Use `id` instead of `show` to avoid quotes ("").
+instance PrettyPrint ASTIdentifier where
+    prettyPrint = id
 
 -- ASTTypeDenoter = OrdinaryTypeDenoter | ArrayTypeDenoter
 instance PrettyPrint ASTTypeDenoter where
+    prettyPrint (OrdinaryTypeDenoter x) = prettyPrint x
+    prettyPrint (ArrayTypeDenoter x) = prettyPrint x
+
+instance PrettyPrint ASTTypeIdentifier where
+    prettyPrint IntegerTypeIdentifier = "integer"
+    prettyPrint RealTypeIdentifier = "real"
+    prettyPrint BooleanTypeIdentifier = "boolean"
+
+instance PrettyPrint ASTArrayType where
+    prettyPrint (subTyp, typId) =
+        "array [" ++ (prettyPrint subTyp) ++ "] of " ++
+        (prettyPrint typId)
+
+instance PrettyPrint ASTSubrangeType where
+    prettyPrint (const1, const2) =
+        (prettyPrint const1) ++ ".." ++ (prettyPrint const2)
+
+instance PrettyPrint ASTConstant where
     prettyPrint = show -- TODO
 
 instance PrettyPrint ASTProcedureDeclarationPart where
