@@ -10,6 +10,7 @@ import PazParser (
     ASTProgram,
     ASTVariableDeclarationPart,
     ASTProcedureDeclarationPart,
+    ASTProcedureDeclaration,
     ASTCompoundStatement,
     ASTVariableDeclaration,
     ASTIdentifierList,
@@ -98,9 +99,17 @@ instance PrettyPrint ASTSign where
     prettyPrint SignPlus = "+"
     prettyPrint SignMinus = "-"
 
-
 instance PrettyPrint ASTProcedureDeclarationPart where
-    prettyPrint = show -- TODO
+    prettyPrint [] = ""
+    prettyPrint (x:xs) =
+        (prettyPrint x) ++ "\n" ++ (prettyPrint xs)
+
+-- ASTProcedureDeclaration = (ASTIdentifier, (Maybe ASTFormalParameterList), ASTVariableDeclarationPart, ASTCompoundStatement)
+instance PrettyPrint ASTProcedureDeclaration where
+    prettyPrint (id, param, var, stat) = 
+        "procedure " ++ (prettyPrint id) ++ "(" ++
+        (show param) ++ ")\n" ++ (prettyPrint var) ++ -- TODO
+        (prettyPrint stat) 
 
 instance PrettyPrint ASTCompoundStatement where
     prettyPrint = show -- TODO
