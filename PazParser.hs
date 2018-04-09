@@ -1039,7 +1039,7 @@ parseProcedureDeclaration =
                 return (x0, x1, x2, x3)
             )
 
-type ASTFormalParameterList = (ASTFormalParameterSection, [ASTFormalParameterSection])
+type ASTFormalParameterList = [ASTFormalParameterSection]
 parseFormalParameterList :: Parser ASTFormalParameterList
 parseFormalParameterList =
     trace
@@ -1047,20 +1047,11 @@ parseFormalParameterList =
         (
             do
                 parseTokenLeftParenthesis
-                x0 <-
-                    parseFormalParameterSection
-                x1 <-
-                    many (
-                        try (
-                            do
-                                parseTokenSemicolon
-                                x0 <-
-                                    parseFormalParameterSection
-                                return x0
-                            )
-                        )
+                x <- try (do
+                    sepBy1 parseFormalParameterSection parseTokenSemicolon
+                    )
                 parseTokenRightParenthesis
-                return (x0, x1)
+                return x
             )
 
 -- presence of "var" keyword should have type "Maybe ()" according to the

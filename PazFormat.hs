@@ -69,15 +69,39 @@ instance PrettyPrint P.AssignmentLeft where
 -- procedures section
 ---------------------
 
--- ASTFormalParameterList = (ASTFormalParameterSection, [ASTFormalParameterSection])
-instance PrettyPrint P.ASTFormalParameterList where
-    prettyPrint (section, sections) = "(" ++ (show section)++ (show sections)++ "\n)"
-
--- ASTProcedureDeclaration = (ASTIdentifier, (Maybe ASTFormalParameterList), ASTVariableDeclarationPart, ASTCompoundStatement)
+-- ASTProcedureDeclaration =
+--     (ASTIdentifier, (Maybe ASTFormalParameterList),
+--         ASTVariableDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProcedureDeclaration where
-    prettyPrint (id, param, var, stat) = 
-        "procedure " ++ (prettyPrint id) ++ 
-        "(" ++ (show param) ++ ")\n" ++ (show var) ++ (show stat) 
+    prettyPrint (id, param, var, stat) =
+        "procedure " ++ (prettyPrint id) ++
+        "(" ++ (prettyPrint param) ++ ");\n" ++
+        (prettyPrint var) ++ (prettyPrint stat)
+
+-- ASTFormalParameterList = [ASTFormalParameterSection]
+instance PrettyPrint P.ASTFormalParameterList where
+    prettyPrint (a:[]) = (prettyPrint a)
+    prettyPrint (a:b:xs) =
+        (prettyPrint a) ++ "; " ++ (prettyPrint (b:xs))
+
+-- ASTFormalParameterSection = (Bool, ASTIdentifierList, ASTTypeDenoter)
+instance PrettyPrint P.ASTFormalParameterSection where
+    prettyPrint (True, ids, typ) =
+        "var " ++ (prettyPrint (False, ids, typ))
+    prettyPrint (False, ids, typ) =
+        (prettyPrint ids) ++ ": " ++ (prettyPrint typ)
+
+-- ASTIdentifierList = [ASTIdentifier]
+instance PrettyPrint P.ASTIdentifierList where
+    prettyPrint [] = ""
+    prettyPrint (x:[]) = id x
+    prettyPrint (x:xs) =
+        (prettyPrint x) ++ ", " ++ (prettyPrint xs)
+
+-- ASTIdentifier = String
+-- Use `id` instead of `show` to avoid quotes ("").
+instance PrettyPrint L.ASTIdentifier where
+    prettyPrint = id
 
 
 ----------------------
@@ -171,30 +195,18 @@ instance PrettyPrint L.ASTUnsignedReal where
 instance PrettyPrint P.ASTVariableDeclarationPart where
     prettyPrint [] = ""
     prettyPrint xs =
-        "var\n" ++ (showVariableDeclarationPart xs)
+        "var\n" ++ (printVariableDeclarationPart xs)
 
-showVariableDeclarationPart :: P.ASTVariableDeclarationPart -> String
-showVariableDeclarationPart [] = ""
-showVariableDeclarationPart (x:xs) =
+printVariableDeclarationPart :: P.ASTVariableDeclarationPart -> String
+printVariableDeclarationPart [] = ""
+printVariableDeclarationPart (x:xs) =
     "    " ++ (prettyPrint x) ++ "\n"
-    ++ showVariableDeclarationPart xs
+    ++ printVariableDeclarationPart xs
 
 -- ASTVariableDeclaration = (ASTIdentifierList, ASTTypeDenoter)
 instance PrettyPrint P.ASTVariableDeclaration where
     prettyPrint (ids, typ) =
         (prettyPrint ids) ++ ": " ++ (prettyPrint typ) ++ ";"
-
--- ASTIdentifierList = [ASTIdentifier]
-instance PrettyPrint P.ASTIdentifierList where
-    prettyPrint [] = ""
-    prettyPrint (x:[]) = id x
-    prettyPrint (x:xs) =
-        (prettyPrint x) ++ ", " ++ (prettyPrint xs)
-
--- ASTIdentifier = String
--- Use `id` instead of `show` to avoid quotes ("").
-instance PrettyPrint L.ASTIdentifier where
-    prettyPrint = id
 
 -- ASTTypeDenoter = OrdinaryTypeDenoter | ArrayTypeDenoter
 instance PrettyPrint P.ASTTypeDenoter where
@@ -219,6 +231,7 @@ instance PrettyPrint P.ASTConstant where
     prettyPrint (sign, n) =
         (prettyPrint sign) ++ (prettyPrint n)
 
+-- ASTUnsignedInteger = Integer, so we just `show` it.
 instance PrettyPrint L.ASTUnsignedInteger where
     prettyPrint = show
 
