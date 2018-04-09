@@ -32,8 +32,34 @@ instance PrettyPrint P.ASTProcedureDeclarationPart where
 -- statement section
 --------------------
 
+-- ASTCompoundStatement = ASTStatementSequence = [ASTStatement]
+-- Instead impl PrettyPrint three times on one type (which is impossible),
+-- use a new function `prettyPrintStatement`.
 instance PrettyPrint P.ASTCompoundStatement where 
-    prettyPrint = show  
+    prettyPrint seq = "begin\n" ++ (prettyPrintStatement seq) ++ "end\n"
+
+prettyPrintStatement :: [ASTStatement] -> String
+prettyPrintStatement [] = ""
+prettyPrintStatement (x:xs) =
+    "    " ++ (prettyPrint x) ++ ";\n" ++ (prettyPrintStatement xs)
+
+instance PrettyPrint P.ASTStatement where 
+    prettyPrint (AssignmentStatement s) = prettyPrint s
+    prettyPrint (ProcedureStatement s) = show s
+    prettyPrint (CompoundStatement s) = show s
+    prettyPrint (IfStatement s) = show s
+    prettyPrint (WhileStatement s) = show s
+    prettyPrint (ForStatement s) = show s
+    prettyPrint (EmptyStatement s) = show s
+
+instance PrettyPrint P.ASTAssignmentStatement where 
+    prettyPrint (left, expr) =
+        (prettyPrint left) ++ " := " ++ (prettyPrint expr)
+
+instance PrettyPrint P.AssignmentLeft where
+    prettyPrint (AssignVariableAccess var) = prettyPrint var
+    prettyPrint (AssignIdentifier id) = prettyPrint id
+
 
 ---------------------
 -- procedures section
