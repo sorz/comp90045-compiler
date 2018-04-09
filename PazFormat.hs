@@ -96,14 +96,14 @@ instance PrettyPrint P.ASTProcedureDeclaration where
     prettyPrint (id, param, var, stat) = 
         case param of 
             Nothing -> "procedure " ++ (prettyPrint id) ++ "(" ++ " nothing " ++ ")\n" ++ (show var) ++ (show stat) 
-            Just param -> "procedure " ++ (prettyPrint id) ++ "(" ++ (show x) ++ ")\n" ++ (show var) ++ (show stat) 
+            Just param -> "procedure " ++ (prettyPrint id) ++ "(" ++ (show param) ++ ")\n" ++ (show var) ++ (show stat) 
 
 -- ASTExpression = (ASTSimpleExpression, Maybe (ASTRelationalOperator, ASTSimpleExpression))
 instance PrettyPrint P.ASTExpression where
     prettyPrint (astSimpExp1, param)= 
         case param of 
-            Nothing -> astSimpExp1
-            Just param ->  astSimpExp1 ++ param
+            Nothing -> prettyPrint astSimpExp1
+            Just param ->  (prettyPrint astSimpExp1) ++ (show param)
 
 -- ASTRelationalOperator = RelationalOperator
 instance PrettyPrint P.ASTRelationalOperator where
@@ -120,12 +120,17 @@ instance PrettyPrint P.ASTRelationalOperator where
 instance PrettyPrint P.ASTSimpleExpression where
     prettyPrint (sign, astTerm1, [(opeartor, astTerm2)]) =
         case sign of 
-            Nothing -> astTerm1 ++ "{" ++ opeartor ++ "}" ++ "\n;"
-            Just sign -> "[" ++ sign ++ "]" ++ astTerm1 ++ "{" ++ opeartor ++ "}" ++ "\n;"
+            Nothing ->
+                (prettyPrint astTerm1) ++ "{" ++
+                (prettyPrint opeartor) ++ "}" ++ "\n;"
+            Just sign ->
+                "[" ++ (prettyPrint sign) ++ "]" ++ 
+                (prettyPrint astTerm1) ++ "{" ++ 
+                (prettyPrint opeartor) ++ "}" ++ "\n;"
 
 -- -- ASTAddingOperator = AddingOperator
 instance PrettyPrint P.ASTAddingOperator where
-    prettyPrint opeartor= 
+    prettyPrint operator = 
         case operator of 
             Plus -> "+" ++ "\n;"
             Minus -> "-" ++ "\n;"
@@ -133,7 +138,8 @@ instance PrettyPrint P.ASTAddingOperator where
 -- -- ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
 instance PrettyPrint P.ASTTerm where
     prettyPrint (factor1, [(opeartor, factor2)]) =  
-        factor1 ++ " {" ++ opeartor ++ " " ++ "factor2" ++ " }" ++ "\n;"
+        (prettyPrint factor1) ++ " {" ++
+        (prettyPrint opeartor) ++ " " ++ "factor2" ++ " }" ++ "\n;"
 
 -- type ASTMutiplayingOperator = MutiplayingOperator
 instance PrettyPrint P.ASTMutiplayingOperator where
@@ -157,14 +163,15 @@ instance PrettyPrint P.ASTFactor where
 -- -- ASTVariableAccess = VariableAccess
 instance PrettyPrint P.ASTVariableAccess where
     prettyPrint sign =
-        case sing of 
+        case sign of 
             IndexedVariable _ -> "indexed_variable" ++ "\n;"
             Identifier _ ->  "identifier" ++ "\n;"
 
 -- -- ASTIndexedVariable = (ASTIdentifier, ASTExpression)
 instance PrettyPrint P.ASTIndexedVariable where
     prettyPrint (id, astExp) = 
-        id ++ " LEFT_BRACKET " ++ astExp ++ " RIGHT_BRACKET " ++ "\n;"
+        (prettyPrint id) ++ " LEFT_BRACKET " ++
+        (prettyPrint astExp) ++ " RIGHT_BRACKET " ++ "\n;"
 
 -- -- ASTUnsignedNumber = UnsignedNumber
 instance PrettyPrint P.ASTUnsignedNumber where
