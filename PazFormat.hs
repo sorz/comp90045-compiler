@@ -8,6 +8,10 @@ import PazParser as P
 class PrettyPrint ast where
     prettyPrint :: ast -> String
 
+instance PrettyPrint ast => PrettyPrint (Maybe ast) where
+    prettyPrint Nothing = ""
+    prettyPrint (Just x) = prettyPrint x
+
 ------------------
 -- program section
 ------------------
@@ -50,7 +54,7 @@ instance PrettyPrint P.ASTStatement where
     prettyPrint (IfStatement s) = show s
     prettyPrint (WhileStatement s) = show s
     prettyPrint (ForStatement s) = show s
-    prettyPrint (EmptyStatement s) = show s
+    prettyPrint (EmptyStatement s) = "(TODO: EmptyStatement)"
 
 instance PrettyPrint P.ASTAssignmentStatement where 
     prettyPrint (left, expr) =
@@ -72,9 +76,8 @@ instance PrettyPrint P.ASTFormalParameterList where
 -- ASTProcedureDeclaration = (ASTIdentifier, (Maybe ASTFormalParameterList), ASTVariableDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProcedureDeclaration where
     prettyPrint (id, param, var, stat) = 
-        case param of 
-            Nothing -> "procedure " ++ (prettyPrint id) ++ "(" ++ " nothing " ++ ")\n" ++ (show var) ++ (show stat) 
-            Just param -> "procedure " ++ (prettyPrint id) ++ "(" ++ (show param) ++ ")\n" ++ (show var) ++ (show stat) 
+        "procedure " ++ (prettyPrint id) ++ 
+        "(" ++ (show param) ++ ")\n" ++ (show var) ++ (show stat) 
 
 
 ----------------------
@@ -85,12 +88,10 @@ instance PrettyPrint P.ASTProcedureDeclaration where
 --     (ASTSimpleExpression,
 --     Maybe (ASTRelationalOperator, ASTSimpleExpression))
 instance PrettyPrint P.ASTExpression where
-    prettyPrint (expr1, param) =
-        case param of 
-            Nothing -> prettyPrint expr1
-            Just (op, expr2) ->
-                (prettyPrint expr1) ++ (prettyPrint op) ++
-                (prettyPrint expr2)
+    prettyPrint (expr1, Nothing) = prettyPrint expr1
+    prettyPrint (expr1, Just (op, expr2)) =
+        (prettyPrint expr1) ++ " " ++ (prettyPrint op) ++ " " ++
+        (prettyPrint expr2)
 
 -- ASTRelationalOperator = RelationalOperator
 instance PrettyPrint P.ASTRelationalOperator where
@@ -105,42 +106,43 @@ instance PrettyPrint P.ASTRelationalOperator where
 --    (Maybe Sign, ASTTerm,
 --      [(ASTAddingOperator, ASTTerm)])
 instance PrettyPrint P.ASTSimpleExpression where
-    prettyPrint (sign, astTerm1, [(opeartor, astTerm2)]) =
-        case sign of 
-            Nothing ->
-                (prettyPrint astTerm1) ++ "{" ++
-                (prettyPrint opeartor) ++ "}"
-            Just sign ->
-                "[" ++ (prettyPrint sign) ++ "]" ++ 
-                (prettyPrint astTerm1) ++ "{" ++ 
-                (prettyPrint opeartor) ++ "}"
+    prettyPrint (sign, term, opTerms) =
+        (prettyPrint sign) ++ (prettyPrint term) ++
+        (prettyPrint opTerms)
 
--- ASTAddingOperator = AddingOperator
+instance PrettyPrint [(P.ASTAddingOperator, P.ASTTerm)] where
+    prettyPrint [] = ""
+    prettyPrint ((op, term):xs) =
+        (prettyPrint op) ++ (prettyPrint term) ++
+        (prettyPrint xs)
+
 instance PrettyPrint P.ASTAddingOperator where
-    prettyPrint Plus = "+"
-    prettyPrint Minus = "-"
+    prettyPrint Plus = " + "
+    prettyPrint Minus = " - "
 
 -- ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
 instance PrettyPrint P.ASTTerm where
-    prettyPrint (factor1, [(opeartor, factor2)]) =  
-        (prettyPrint factor1) ++ " {" ++
-        (prettyPrint opeartor) ++ " " ++ "factor2" ++ " }" ++ "\n;"
+    prettyPrint (factor, opFactors) =
+        (prettyPrint factor) ++ (prettyPrint opFactors)
 
--- type ASTMutiplayingOperator = MutiplayingOperator
+instance PrettyPrint [(ASTMutiplayingOperator, ASTFactor)] where
+    prettyPrint [] = ""
+    prettyPrint ((op, factor):xs) =
+        (prettyPrint op) ++ (prettyPrint factor) ++
+        (prettyPrint xs)
+
 instance PrettyPrint P.ASTMutiplayingOperator where
-    prettyPrint P.Times = "*"
-    prettyPrint P.DivideBy = "/"
-    prettyPrint P.Div = "div"
-    prettyPrint P.And = "and"
+    prettyPrint P.Times = " * "
+    prettyPrint P.DivideBy = " / "
+    prettyPrint P.Div = " div "
+    prettyPrint P.And = " and "
 
--- ASTFactor = Factor
 instance PrettyPrint P.ASTFactor where
     prettyPrint (UnsignedConstant const) = prettyPrint const
     prettyPrint (VariableAccess var) = prettyPrint var
     prettyPrint (Expression expr) = "(" ++ (prettyPrint expr) ++ ")"
     prettyPrint (NotFactor factor) = "not " ++ (prettyPrint factor)
 
--- ASTVariableAccess = VariableAccess
 instance PrettyPrint P.ASTVariableAccess where
     prettyPrint (IndexedVariable var) = prettyPrint var
     prettyPrint (Identifier id) = prettyPrint id
@@ -214,8 +216,7 @@ instance PrettyPrint P.ASTSubrangeType where
         (prettyPrint const1) ++ ".." ++ (prettyPrint const2)
 
 instance PrettyPrint P.ASTConstant where
-    prettyPrint (Nothing, n) = prettyPrint n
-    prettyPrint ((Just sign), n) =
+    prettyPrint (sign, n) =
         (prettyPrint sign) ++ (prettyPrint n)
 
 instance PrettyPrint L.ASTUnsignedInteger where
