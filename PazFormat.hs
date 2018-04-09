@@ -55,42 +55,44 @@ instance PrettyPrint P.ASTProcedureDeclaration where
 -- expressions section
 ----------------------
 
--- ASTExpression = (ASTSimpleExpression, Maybe (ASTRelationalOperator, ASTSimpleExpression))
+-- ASTExpression =
+--     (ASTSimpleExpression,
+--     Maybe (ASTRelationalOperator, ASTSimpleExpression))
 instance PrettyPrint P.ASTExpression where
-    prettyPrint (astSimpExp1, param)= 
+    prettyPrint (expr1, param) =
         case param of 
-            Nothing -> prettyPrint astSimpExp1
-            Just param ->  (prettyPrint astSimpExp1) ++ (show param)
+            Nothing -> prettyPrint expr1
+            Just (op, expr2) ->
+                (prettyPrint expr1) ++ (prettyPrint op) ++
+                (prettyPrint expr2)
 
 -- ASTRelationalOperator = RelationalOperator
 instance PrettyPrint P.ASTRelationalOperator where
-    prettyPrint reloperator =
-        case reloperator of 
-            Equal -> "EQUAL" ++ "\n;"
-            NotEqual -> "NOT_EQUAL" ++ "\n;"
-            LessThan -> "LESS_THAN" ++ "\n;"
-            GreaterThan -> "GREATER_THAN" ++ "\n;"
-            LessThanOrEqual -> "LESS_THAN_OR_EQUAL" ++ "\n;"
-            GreaterThanOrEqual -> "GREATER_THAN_OR_EQUAL" ++ "\n;"
+    prettyPrint Equal = "="
+    prettyPrint NotEqual = "<>"
+    prettyPrint LessThan = "<"
+    prettyPrint GreaterThan = ">"
+    prettyPrint LessThanOrEqual = "<="
+    prettyPrint GreaterThanOrEqual = ">="
 
--- ASTSimpleExpression = (Maybe Sign, ASTTerm, [(ASTAddingOperator, ASTTerm)])
+-- ASTSimpleExpression =
+--    (Maybe Sign, ASTTerm,
+--      [(ASTAddingOperator, ASTTerm)])
 instance PrettyPrint P.ASTSimpleExpression where
     prettyPrint (sign, astTerm1, [(opeartor, astTerm2)]) =
         case sign of 
             Nothing ->
                 (prettyPrint astTerm1) ++ "{" ++
-                (prettyPrint opeartor) ++ "}" ++ "\n;"
+                (prettyPrint opeartor) ++ "}"
             Just sign ->
                 "[" ++ (prettyPrint sign) ++ "]" ++ 
                 (prettyPrint astTerm1) ++ "{" ++ 
-                (prettyPrint opeartor) ++ "}" ++ "\n;"
+                (prettyPrint opeartor) ++ "}"
 
 -- ASTAddingOperator = AddingOperator
 instance PrettyPrint P.ASTAddingOperator where
-    prettyPrint operator = 
-        case operator of 
-            Plus -> "+" ++ "\n;"
-            Minus -> "-" ++ "\n;"
+    prettyPrint Plus = "+"
+    prettyPrint Minus = "-"
 
 -- ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
 instance PrettyPrint P.ASTTerm where
@@ -100,51 +102,38 @@ instance PrettyPrint P.ASTTerm where
 
 -- type ASTMutiplayingOperator = MutiplayingOperator
 instance PrettyPrint P.ASTMutiplayingOperator where
-    prettyPrint multiOperator= 
-        case  multiOperator of 
-            P.Times -> "TIMES" ++ "\n;"
-            P.DivideBy -> "DIVIDE_BY" ++ "\n;"
-            P.Div -> "DIV" ++ "\n;"
-            P.And -> "AND" ++ "\n;"
+    prettyPrint P.Times = "*"
+    prettyPrint P.DivideBy = "/"
+    prettyPrint P.Div = "div"
+    prettyPrint P.And = "and"
 
 -- ASTFactor = Factor
 instance PrettyPrint P.ASTFactor where
-    prettyPrint factor = 
-        case factor of
-            UnsignedConstant _ -> "unsigned_constant" ++ "\n;"
-            VariableAccess _ -> "variable_access" ++ "\n;"
-            Expression _ -> "LEFT_PARENTHESIS expression RIGHT_PARENTHESIS" ++ "\n;"
-            NotFactor _ -> "NOT factor" ++ "\n;"
-
+    prettyPrint (UnsignedConstant const) = prettyPrint const
+    prettyPrint (VariableAccess var) = prettyPrint var
+    prettyPrint (Expression expr) = "(" ++ (prettyPrint expr) ++ ")"
+    prettyPrint (NotFactor factor) = "not " ++ (prettyPrint factor)
 
 -- ASTVariableAccess = VariableAccess
 instance PrettyPrint P.ASTVariableAccess where
-    prettyPrint sign =
-        case sign of 
-            IndexedVariable _ -> "indexed_variable" ++ "\n;"
-            Identifier _ ->  "identifier" ++ "\n;"
+    prettyPrint (IndexedVariable var) = prettyPrint var
+    prettyPrint (Identifier id) = prettyPrint id
 
 -- ASTIndexedVariable = (ASTIdentifier, ASTExpression)
 instance PrettyPrint P.ASTIndexedVariable where
     prettyPrint (id, astExp) = 
-        (prettyPrint id) ++ " LEFT_BRACKET " ++
-        (prettyPrint astExp) ++ " RIGHT_BRACKET " ++ "\n;"
+        (prettyPrint id) ++ "(" ++ (prettyPrint astExp) ++ ")"
 
--- ASTUnsignedNumber = UnsignedNumber
 instance PrettyPrint P.ASTUnsignedNumber where
-    prettyPrint unsignedNum = 
-        case  unsignedNum of 
-            UnsignedInteger _ -> "unsigned_integer" ++ "\n;"
-            UnsignedReal _ -> "unsigned_real" ++ "\n;"
+    prettyPrint (UnsignedInteger int) = prettyPrint int
+    prettyPrint (UnsignedReal real) = prettyPrint real
 
-
--- ASTUnsignedConstant = UnsignedConstant
 instance PrettyPrint P.ASTUnsignedConstant where
-    prettyPrint unsignedCon = 
-        case unsignedCon of 
-            UnsignedNumber _ -> " unsigned_number" ++ "\n;"
-            CharacterString _ -> " unsigned_real" ++ "\n;"
+    prettyPrint (UnsignedNumber num) = prettyPrint num
+    prettyPrint (CharacterString str) = prettyPrint str
 
+instance PrettyPrint L.ASTUnsignedReal where
+    prettyPrint = show -- TODO
 
 --------------------
 -- variables section
