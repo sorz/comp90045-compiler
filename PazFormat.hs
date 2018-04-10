@@ -76,7 +76,7 @@ instance PrettyPrint P.ASTStatement where
 -- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 
     prettyPrint (left, expr) =
-        (prettyPrint left) ++ " := " ++ (show expr)
+        (prettyPrint left) ++ " := " ++ (prettyPrint expr)
 
 instance PrettyPrint P.AssignmentLeft where
     prettyPrint (AssignVariableAccess var) = prettyPrint var
@@ -159,7 +159,19 @@ instance PrettyPrint P.ASTIdentifierList where
 ----------------------
 
 instance PrettyPrint P.ASTExpression where
-    prettyPrint = show
+    prettyPrint (RelOp op expr1 expr2)
+        = (prettyPrint expr1) ++ (prettyPrint op) ++ (prettyPrint expr2)
+    prettyPrint (SignOp op expr)
+        = (prettyPrint op) ++ (prettyPrint expr)
+    prettyPrint (AddOp op expr1 expr2)
+        = (prettyPrint expr1) ++ (prettyPrint op) ++ (prettyPrint expr2)
+    prettyPrint (MulOp op expr1 expr2)
+        = (prettyPrint expr1) ++ (prettyPrint op) ++ (prettyPrint expr2)
+    prettyPrint (NotOp expr)
+        = "not " ++ (prettyPrint expr)
+    prettyPrint (Const const) = prettyPrint const
+    prettyPrint (Var var) = prettyPrint var
+
 
 -- ASTRelationalOperator = RelationalOperator
 instance PrettyPrint P.ASTRelationalOperator where
