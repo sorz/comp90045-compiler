@@ -24,6 +24,7 @@ instance PrettyPrint (Ident stat) where
         ident "" = ""
         ident l = "    " ++ l
         -- like unlines, but without terminating newline
+        unlines' [] = ""
         unlines' (a:[]) = a
         unlines' (a:b:xs) = a ++ "\n" ++ (unlines' (b:xs))
 
@@ -70,7 +71,7 @@ instance PrettyPrint P.ASTStatement where
     prettyPrint (IfStatement s) = prettyPrint s
     prettyPrint (WhileStatement s) = prettyPrint s
     prettyPrint (ForStatement s) = prettyPrint s
-    prettyPrint (EmptyStatement s) = "(TODO: EmptyStatement)"
+    prettyPrint EmptyStatement = ""
 
 -- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 

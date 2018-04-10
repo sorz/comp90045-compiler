@@ -672,7 +672,7 @@ data Statement =
     IfStatement ASTIfStatement |
     WhileStatement ASTWhileStatement |
     ForStatement ASTForStatement |
-    EmptyStatement ASTEmptyStatement
+    EmptyStatement
     deriving Show
 parseStatement :: Parser ASTStatement
 parseStatement =
@@ -705,7 +705,7 @@ parseStatement =
             ) <|>
         do
             x <- parseEmptyStatement
-            return (EmptyStatement x)
+            return EmptyStatement
         )
 
 type ASTEmptyStatement = ()
