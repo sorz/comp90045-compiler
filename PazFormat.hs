@@ -221,7 +221,9 @@ instance PrettyPrint P.ASTUnsignedNumber where
 instance PrettyPrint P.ASTUnsignedConstant where
     prettyPrint (UnsignedNumber num) = prettyPrint num
     prettyPrint (CharacterString str) =
-        "'" ++ prettyPrint str ++ "'"
+        "'" ++ (concatMap repl (prettyPrint str)) ++ "'"
+        where repl '\'' = "''"
+              repl c = [c]
 
 instance PrettyPrint L.ASTUnsignedReal where
     prettyPrint = show -- TODO
