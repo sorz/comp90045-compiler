@@ -16,6 +16,7 @@ import Text.Parsec (
     endBy1,
     lookAhead
     )
+import Text.Parsec.Expr
 import Data.Char
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -818,134 +819,69 @@ parseWhileStatement =
 
 -- Expression section
 
-type ASTExpression = (ASTSimpleExpression, Maybe (ASTRelationalOperator, ASTSimpleExpression))
+data ASTExpression =
+    RelOp ASTRelationalOperator ASTExpression ASTExpression |
+    SignOp Sign ASTExpression |
+    AddOp ASTAddingOperator ASTExpression ASTExpression |
+    MulOp ASTMutiplayingOperator ASTExpression ASTExpression |
+    NotOp ASTExpression |
+    Const ASTUnsignedConstant |
+    Var ASTVariableAccess
+    deriving Show
+
 parseExpression :: Parser ASTExpression
-parseExpression = 
-    trace
-        "parseExpression"
-        (do 
-            x0 <- parseSimpleExpression
-            x1 <- optionMaybe (try (do
-                    y0 <- parseRelationalOperator
-                    y1 <- parseSimpleExpression
-                    return (y0, y1)
-                ))
-            return (x0, x1)
-            )
+parseExpression = buildExpressionParser operatorTable parseTerm
 
-type ASTRelationalOperator = RelationalOperator
-data RelationalOperator =
-    Equal | NotEqual | LessThan | GreaterThan | LessThanOrEqual | GreaterThanOrEqual
-    deriving Show
-parseRelationalOperator :: Parser ASTRelationalOperator
-parseRelationalOperator =
-    trace
-        "parseRelationalOperator"
-        (
-            (parseTokenEqual >> return Equal) <|>
-            (parseTokenNotEqual >> return NotEqual) <|>
-            (parseTokenLessThan >> return LessThan) <|>
-            (parseTokenGreaterThan >> return GreaterThan) <|>
-            (parseTokenLessThanOrEqual >> return LessThanOrEqual) <|>
-            (parseTokenGreaterThanOrEqual >> return GreaterThanOrEqual)
-        )
-
-type ASTSimpleExpression = (Maybe Sign, ASTTerm, [(ASTAddingOperator, ASTTerm)])
-parseSimpleExpression :: Parser ASTSimpleExpression
-parseSimpleExpression =
-    trace
-        "parseSimpleExpression"
-        (do
-            x0 <- optionMaybe (try parseSign)
-            x1 <- parseTerm
-            x2 <- many (
-                try (
-                    do
-                        y0 <- parseAddingOperator
-                        y1 <- parseTerm
-                        return (y0, y1)
-                    )
-                )
-            return (x0, x1, x2)
-            )
-
-type ASTAddingOperator = AddingOperator
-data AddingOperator = 
-    Plus | Minus | Or
-    deriving Show
-parseAddingOperator :: Parser ASTAddingOperator
-parseAddingOperator =
-    trace
-        "parseAddingOperator"
-        (
-            (parseTokenPlus >> return Plus) <|>
-            (parseTokenMinus >> return Minus) <|>
-            (parseTokenOr >> return Or)
-        )
-
-type ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
-parseTerm :: Parser ASTTerm
+parseTerm :: Parser ASTExpression
 parseTerm =
     trace
         "parseTerm"
-        (do
-            x0 <- parseFactor
-            x1 <- many (
-                try (do
-                    y0 <- parseMutiplyingOperator
-                    y1 <- parseFactor
-                    return (y0, y1)
-                    )
-                )
-            return (x0, x1)
-        )
+        try (do
+            parseTokenLeftParenthesis
+            x <- parseExpression
+            parseTokenRightParenthesis
+            return x
+            ) <|>
+        try (do
+            x <- parseUnsignedConstant
+            return (Const x)
+            ) <|>
+        try (do
+            x <- parseVariableAccess
+            return (Var x)
+            ) <|>
+        parseExpression
 
-type ASTMutiplayingOperator = MutiplayingOperator
-data MutiplayingOperator = 
+operatorTable = [
+    [ Prefix (parseTokenNot      >> return NotOp) ],
+    [ Infix  (parseTokenTimes    >> return (MulOp Times))    AssocLeft,
+      Infix  (parseTokenDivideBy >> return (MulOp DivideBy)) AssocLeft,
+      Infix  (parseTokenDiv      >> return (MulOp Div))      AssocLeft,
+      Infix  (parseTokenAnd      >> return (MulOp And))      AssocLeft],
+    [ Prefix (parseTokenPlus     >> return (SignOp SignPlus)),
+      Prefix (parseTokenMinus    >> return (SignOp SignMinus)),
+      Infix  (parseTokenPlus     >> return (AddOp Plus))     AssocLeft,
+      Infix  (parseTokenMinus    >> return (AddOp Minus))    AssocLeft,
+      Infix  (parseTokenOr       >> return (AddOp Or))       AssocLeft],
+    [ Infix  (parseTokenEqual    >> return (RelOp Equal))    AssocLeft,
+      Infix  (parseTokenNotEqual >> return (RelOp NotEqual)) AssocLeft,
+      Infix  (parseTokenLessThan >> return (RelOp LessThan)) AssocLeft,
+      Infix  (parseTokenGreaterThan >> return (RelOp GreaterThan)) AssocLeft,
+      Infix  (parseTokenLessThanOrEqual >> return (RelOp LessEqual)) AssocLeft,
+      Infix  (parseTokenGreaterThanOrEqual >> return (RelOp GreaterEqual)) AssocLeft]
+  ]
+
+data ASTRelationalOperator =
+    Equal | NotEqual | LessThan | GreaterThan | LessEqual | GreaterEqual
+    deriving Show
+
+data ASTAddingOperator = 
+    Plus | Minus | Or
+    deriving Show
+
+data ASTMutiplayingOperator = 
     Times | DivideBy | Div | And
     deriving Show
-parseMutiplyingOperator :: Parser ASTMutiplayingOperator
-parseMutiplyingOperator =
-    trace
-        "parseAddingOperator"
-        (
-            (parseTokenTimes >> return Times) <|>
-            (parseTokenDivideBy >> return DivideBy) <|>
-            (parseTokenDiv >> return Div) <|>
-            (parseTokenAnd >> return And)
-        )
-
-type ASTFactor = Factor
-data Factor =
-    UnsignedConstant ASTUnsignedConstant |
-    VariableAccess ASTVariableAccess |
-    Expression ASTExpression |
-    NotFactor ASTFactor
-    deriving Show
-parseFactor :: Parser ASTFactor
-parseFactor =
-    trace
-        "parseFactor"
-        (
-            try (do
-                x <- parseUnsignedConstant
-                return (UnsignedConstant x)
-                ) <|>
-            try (do
-                x <- parseVariableAccess
-                return (VariableAccess x)
-                ) <|>
-            try (do
-                parseTokenLeftParenthesis
-                x <- parseExpression
-                parseTokenRightParenthesis
-                return (Expression x)
-                ) <|>
-            do
-                parseTokenNot
-                x <- parseFactor
-                return (NotFactor x)
-        )
 
 type ASTVariableAccess = VariableAccess
 data VariableAccess =

@@ -76,7 +76,7 @@ instance PrettyPrint P.ASTStatement where
 -- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 
     prettyPrint (left, expr) =
-        (prettyPrint left) ++ " := " ++ (prettyPrint expr)
+        (prettyPrint left) ++ " := " ++ (show expr)
 
 instance PrettyPrint P.AssignmentLeft where
     prettyPrint (AssignVariableAccess var) = prettyPrint var
@@ -158,14 +158,8 @@ instance PrettyPrint P.ASTIdentifierList where
 -- expressions section
 ----------------------
 
--- ASTExpression =
---     (ASTSimpleExpression,
---     Maybe (ASTRelationalOperator, ASTSimpleExpression))
 instance PrettyPrint P.ASTExpression where
-    prettyPrint (expr1, Nothing) = prettyPrint expr1
-    prettyPrint (expr1, Just (op, expr2)) =
-        (prettyPrint expr1) ++ " " ++ (prettyPrint op) ++ " " ++
-        (prettyPrint expr2)
+    prettyPrint = show
 
 -- ASTRelationalOperator = RelationalOperator
 instance PrettyPrint P.ASTRelationalOperator where
@@ -173,50 +167,19 @@ instance PrettyPrint P.ASTRelationalOperator where
     prettyPrint NotEqual = "<>"
     prettyPrint LessThan = "<"
     prettyPrint GreaterThan = ">"
-    prettyPrint LessThanOrEqual = "<="
-    prettyPrint GreaterThanOrEqual = ">="
-
--- ASTSimpleExpression =
---    (Maybe Sign, ASTTerm,
---      [(ASTAddingOperator, ASTTerm)])
-instance PrettyPrint P.ASTSimpleExpression where
-    prettyPrint (sign, term, opTerms) =
-        (prettyPrint sign) ++ (prettyPrint term) ++
-        (prettyPrint opTerms)
-
-instance PrettyPrint [(P.ASTAddingOperator, P.ASTTerm)] where
-    prettyPrint [] = ""
-    prettyPrint ((op, term):xs) =
-        (prettyPrint op) ++ (prettyPrint term) ++
-        (prettyPrint xs)
+    prettyPrint LessEqual = "<="
+    prettyPrint GreaterEqual = ">="
 
 instance PrettyPrint P.ASTAddingOperator where
     prettyPrint Plus = " + "
     prettyPrint Minus = " - "
     prettyPrint Or = " or "
 
--- ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
-instance PrettyPrint P.ASTTerm where
-    prettyPrint (factor, opFactors) =
-        (prettyPrint factor) ++ (prettyPrint opFactors)
-
-instance PrettyPrint [(ASTMutiplayingOperator, ASTFactor)] where
-    prettyPrint [] = ""
-    prettyPrint ((op, factor):xs) =
-        (prettyPrint op) ++ (prettyPrint factor) ++
-        (prettyPrint xs)
-
 instance PrettyPrint P.ASTMutiplayingOperator where
     prettyPrint P.Times = " * "
     prettyPrint P.DivideBy = " / "
     prettyPrint P.Div = " div "
     prettyPrint P.And = " and "
-
-instance PrettyPrint P.ASTFactor where
-    prettyPrint (UnsignedConstant const) = prettyPrint const
-    prettyPrint (VariableAccess var) = prettyPrint var
-    prettyPrint (Expression expr) = "(" ++ (prettyPrint expr) ++ ")"
-    prettyPrint (NotFactor factor) = "not " ++ (prettyPrint factor)
 
 instance PrettyPrint P.ASTVariableAccess where
     prettyPrint (IndexedVariable var) = prettyPrint var
