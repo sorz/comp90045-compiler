@@ -220,7 +220,8 @@ instance PrettyPrint P.ASTUnsignedNumber where
 
 instance PrettyPrint P.ASTUnsignedConstant where
     prettyPrint (UnsignedNumber num) = prettyPrint num
-    prettyPrint (CharacterString str) = prettyPrint str
+    prettyPrint (CharacterString str) =
+        "'" ++ prettyPrint str ++ "'"
 
 instance PrettyPrint L.ASTUnsignedReal where
     prettyPrint = show -- TODO
