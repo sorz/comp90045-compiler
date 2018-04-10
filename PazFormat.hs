@@ -105,7 +105,8 @@ printWithOptionIdent s = prettyPrint (Ident s)
 -- while statement
 instance PrettyPrint P.ASTWhileStatement where
     prettyPrint (expr, stat) =
-        "while " +++ expr +++ " do\n" +++ stat
+        "while " +++ expr +++ " do\n" ++
+        (printWithOptionIdent stat)
     
 -- if statement
 instance PrettyPrint P.ASTIfStatement where 
@@ -114,7 +115,7 @@ instance PrettyPrint P.ASTIfStatement where
         (printWithOptionIdent stat1)
     prettyPrint (expr, stat1, (Just stat2)) =
         ((expr, stat1, Nothing) :: ASTIfStatement) +++
-        "\nelse\n" +++ stat2
+        "\nelse\n" +++ (printWithOptionIdent stat2)
 
 -- for statement
 instance PrettyPrint P.ASTForStatement where 
