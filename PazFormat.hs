@@ -64,6 +64,37 @@ instance PrettyPrint P.AssignmentLeft where
     prettyPrint (AssignVariableAccess var) = prettyPrint var
     prettyPrint (AssignIdentifier id) = prettyPrint id
 
+--procedure_statement
+--identifier [actual_parameter_list]
+instance PrettyPrint P.ASTProcedureStatement where
+    prettyPrint (id, Nothing) = (prettyPrint id) ++ "\n"
+    prettyPrint (id, (Just params)) =
+        (prettyPrint id) ++ (prettyPrint params) ++ "\n"
+
+--actual_parameter_list
+-- : LEFT_PARENTHESIS expression {COMMA expression} RIGHT_PARENTHESIS
+instance PrettyPrint P.ASTActualParameterList where
+    prettyPrint (expression, []) = "("  ++ expression ++ ")" 
+    prettyPrint (expression, (x:xs)) =
+        "(" ++ (prettyPrint expression) ++ (prettyPrint x) ++ ";" ++ (prettyPrint xs)  ++ ")"
+
+instance PrettyPrint P.ASTWhileStatement where
+    prettyPrint (expression, statement) =
+        "while " ++ expression ++ " do" ++ statement ++ "\n"
+    
+instance PrettyPrint P.ASTIfStatement where 
+    prettyPrint (expression, statement1, Nothing) =
+        "if " ++ (prettyPrint expression) ++ " then" ++ statement1 ++ "\n"
+    prettyPrint (expression, statement1, (Just statement2)) =
+        "if " ++ (prettyPrint expression) ++ " then" ++ statement1 ++ "\n" ++ statement2
+
+-- for_statement
+-- FOR identifier ASSIGN expression (TO | DOWN_TO) expression DO statement
+instance PrettyPrint P.ASTForStatement where 
+    prettyPrint (id , expression1, (ForTo x), expression2, statement) = 
+          "for" ++ id ++ " = " ++ expression ++ x ++ expression ++ "\n"
+    prettyPrint (id, expression, expression, (To y), statement) =
+          "for" ++ id ++ " = " ++ expression ++ y ++ statement ++ "\n"
 
 ---------------------
 -- procedures section
