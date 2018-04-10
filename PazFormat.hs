@@ -13,6 +13,10 @@ instance PrettyPrint ast => PrettyPrint (Maybe ast) where
     prettyPrint Nothing = ""
     prettyPrint (Just x) = prettyPrint x
 
+-- helper to easily print a sequence of things
+(+++) :: PrettyPrint a => PrettyPrint b => a -> b -> String
+(+++) a b = (prettyPrint a) ++ (prettyPrint b)
+
 -- statement with a ident (four space before each lines)
 data Ident stat where
     Ident :: ASTStatement -> Ident stat
@@ -32,7 +36,7 @@ instance PrettyPrint (Ident stat) where
 printSepBy :: PrettyPrint ast => String -> [ast] -> String
 printSepBy sep (a:[]) = prettyPrint a
 printSepBy sep (a:b:xs) = 
-    (prettyPrint a) ++ sep ++ (printSepBy sep (b:xs))
+    a +++ sep ++ (printSepBy sep (b:xs))
 
 ------------------
 -- program section
@@ -44,15 +48,13 @@ printSepBy sep (a:b:xs) =
 --    ASTProcedureDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProgram where
     prettyPrint (id, variable, procedure, statement) =
-        "program " ++ (prettyPrint id) ++ ";\n\n" ++
-        (prettyPrint variable) ++
-        (prettyPrint procedure) ++ "\n" ++
-        (prettyPrint statement) ++ "."
+        "program " +++ id +++ ";\n\n" +++
+        variable +++ procedure +++ "\n" +++
+        statement +++ "."
 
 instance PrettyPrint P.ASTProcedureDeclarationPart where
     prettyPrint [] = ""
-    prettyPrint (x:xs) =
-        (prettyPrint x) ++ ";\n" ++ (prettyPrint xs)
+    prettyPrint (x:xs) = x +++ ";\n" +++ xs
 
 --------------------
 -- statement section
@@ -76,7 +78,7 @@ instance PrettyPrint P.ASTStatement where
 -- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 
     prettyPrint (left, expr) =
-        (prettyPrint left) ++ " := " ++ (prettyPrint expr)
+        left +++ " := " +++ expr
 
 instance PrettyPrint P.AssignmentLeft where
     prettyPrint (AssignVariableAccess var) = prettyPrint var
@@ -86,12 +88,12 @@ instance PrettyPrint P.AssignmentLeft where
 instance PrettyPrint P.ASTProcedureStatement where
     prettyPrint (id, Nothing) = prettyPrint id
     prettyPrint (id, Just params) =
-        (prettyPrint id) ++ "(" ++ (prettyPrint params) ++ ")"
+        id +++ "(" +++ params +++ ")"
 
 instance PrettyPrint P.ASTActualParameterList where
     prettyPrint (a:[]) = prettyPrint a 
     prettyPrint (a:b:xs) =
-        (prettyPrint a) ++ ", " ++ (prettyPrint (b:xs))
+        a +++ ", " +++ (b:xs)
 
 -- while/if/for statements
 -- print with ident expect CompoundStatement
@@ -103,24 +105,22 @@ printWithOptionIdent s = prettyPrint (Ident s)
 -- while statement
 instance PrettyPrint P.ASTWhileStatement where
     prettyPrint (expr, stat) =
-        "while " ++ (prettyPrint expr) ++ " do\n" ++
-        (printWithOptionIdent stat)
+        "while " +++ expr +++ " do\n" +++ stat
     
 -- if statement
 instance PrettyPrint P.ASTIfStatement where 
     prettyPrint (expr, stat1, Nothing) =
-        "if " ++ (prettyPrint expr) ++ " then\n" ++
+        "if " +++ expr +++ " then\n" +++
         (printWithOptionIdent stat1)
     prettyPrint (expr, stat1, (Just stat2)) =
-        (prettyPrint ((expr, stat1, Nothing) :: ASTIfStatement)) ++
-        "\nelse\n" ++ (printWithOptionIdent stat2)
+        ((expr, stat1, Nothing) :: ASTIfStatement) +++
+        "\nelse\n" +++ stat2
 
 -- for statement
 instance PrettyPrint P.ASTForStatement where 
     prettyPrint (id , expr1, to, expr2, stat) = 
-          "for " ++ (prettyPrint id) ++ " := " ++ (prettyPrint expr1) ++
-          (prettyPrint to) ++ (prettyPrint expr2) ++ "do" ++
-          (printWithOptionIdent stat)
+          "for " +++ id +++ " := " +++ expr1 +++ to +++
+          expr2 +++ "do" +++ (printWithOptionIdent stat)
 
 instance PrettyPrint P.ForDirection where
     prettyPrint ForTo = " to "
@@ -135,9 +135,8 @@ instance PrettyPrint P.ForDirection where
 --         ASTVariableDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProcedureDeclaration where
     prettyPrint (id, param, var, stat) =
-        "\nprocedure " ++ (prettyPrint id) ++
-        (prettyPrint param) ++ ";\n" ++
-        (prettyPrint var) ++ (prettyPrint stat)
+        "\nprocedure " +++ id +++ param +++ ";\n" +++
+        var +++ stat
 
 -- ASTFormalParameterList = [ASTFormalParameterSection]
 instance PrettyPrint P.ASTFormalParameterList where
@@ -145,10 +144,8 @@ instance PrettyPrint P.ASTFormalParameterList where
 
 -- ASTFormalParameterSection = (Bool, ASTIdentifierList, ASTTypeDenoter)
 instance PrettyPrint P.ASTFormalParameterSection where
-    prettyPrint (True, ids, typ) =
-        "var " ++ (prettyPrint (False, ids, typ))
-    prettyPrint (False, ids, typ) =
-        (prettyPrint ids) ++ ": " ++ (prettyPrint typ)
+    prettyPrint (True, ids, typ) = "var " +++ (False, ids, typ)
+    prettyPrint (False, ids, typ) = ids +++ ": " +++ typ
 
 -- ASTIdentifierList = [ASTIdentifier]
 instance PrettyPrint P.ASTIdentifierList where
@@ -160,27 +157,27 @@ instance PrettyPrint P.ASTIdentifierList where
 
 instance PrettyPrint P.ASTExpression where
     prettyPrint (RelOp op expr1 expr2)
-        = (prettyPrint expr1) ++ (prettyPrint op) ++ (prettyPrint expr2)
+        = expr1 +++ op +++ expr2
     prettyPrint (SignOp op expr)
-        = (prettyPrint op) ++ (prettyPrint expr)
+        = op +++ expr
     prettyPrint (AddOp op expr1 expr2)
-        = (prettyPrint expr1) ++ (prettyPrint op) ++ (prettyPrint expr2)
+        = expr1 +++ op +++ expr2
     prettyPrint (MulOp op expr1 expr2)
-        = (prettyPrint expr1) ++ (prettyPrint op) ++ (prettyPrint expr2)
+        = expr1 +++ op +++ expr2
     prettyPrint (NotOp expr)
-        = "not " ++ (prettyPrint expr)
+        = "not " +++ expr
     prettyPrint (Const const) = prettyPrint const
     prettyPrint (Var var) = prettyPrint var
 
 
 -- ASTRelationalOperator = RelationalOperator
 instance PrettyPrint P.ASTRelationalOperator where
-    prettyPrint Equal = "="
-    prettyPrint NotEqual = "<>"
-    prettyPrint LessThan = "<"
-    prettyPrint GreaterThan = ">"
-    prettyPrint LessEqual = "<="
-    prettyPrint GreaterEqual = ">="
+    prettyPrint Equal = " = "
+    prettyPrint NotEqual = " <> "
+    prettyPrint LessThan = " < "
+    prettyPrint GreaterThan = " > "
+    prettyPrint LessEqual = " <= "
+    prettyPrint GreaterEqual = " >= "
 
 instance PrettyPrint P.ASTAddingOperator where
     prettyPrint Plus = " + "
@@ -200,7 +197,7 @@ instance PrettyPrint P.ASTVariableAccess where
 -- ASTIndexedVariable = (ASTIdentifier, ASTExpression)
 instance PrettyPrint P.ASTIndexedVariable where
     prettyPrint (id, astExp) = 
-        (prettyPrint id) ++ "[" ++ (prettyPrint astExp) ++ "]"
+        id +++ "[" +++ astExp +++ "]"
 
 instance PrettyPrint P.ASTUnsignedNumber where
     prettyPrint (UnsignedInteger int) = prettyPrint int
@@ -226,13 +223,13 @@ instance PrettyPrint P.ASTVariableDeclarationPart where
 printVariableDeclarationPart :: P.ASTVariableDeclarationPart -> String
 printVariableDeclarationPart [] = ""
 printVariableDeclarationPart (x:xs) =
-    "    " ++ (prettyPrint x) ++ "\n"
-    ++ printVariableDeclarationPart xs
+    "    " +++ x ++ "\n"
+    ++ (printVariableDeclarationPart xs)
 
 -- ASTVariableDeclaration = (ASTIdentifierList, ASTTypeDenoter)
 instance PrettyPrint P.ASTVariableDeclaration where
     prettyPrint (ids, typ) =
-        (prettyPrint ids) ++ ": " ++ (prettyPrint typ) ++ ";"
+        ids +++ ": " +++ typ +++ ";"
 
 -- ASTTypeDenoter = OrdinaryTypeDenoter | ArrayTypeDenoter
 instance PrettyPrint P.ASTTypeDenoter where
@@ -246,16 +243,15 @@ instance PrettyPrint P.ASTTypeIdentifier where
 
 instance PrettyPrint P.ASTArrayType where
     prettyPrint (subTyp, typId) =
-        "array [" ++ (prettyPrint subTyp) ++ "] of " ++
-        (prettyPrint typId)
+        "array [" +++ subTyp +++ "] of " +++ typId
 
 instance PrettyPrint P.ASTSubrangeType where
     prettyPrint (const1, const2) =
-        (prettyPrint const1) ++ ".." ++ (prettyPrint const2)
+        const1 +++ ".." +++ const2
 
 instance PrettyPrint P.ASTConstant where
     prettyPrint (sign, n) =
-        (prettyPrint sign) ++ (prettyPrint n)
+        sign +++ n
 
 ----------------
 -- lexer section
@@ -276,13 +272,13 @@ instance PrettyPrint String where
 
 instance PrettyPrint L.ASTUnsignedReal where
     prettyPrint (int, Nothing, scale) =
-        (prettyPrint int) ++ (prettyPrint scale)
+        int +++ scale
     prettyPrint (int, Just float, scale) =
-        (prettyPrint int) ++ '.':(prettyPrint float) ++ (prettyPrint scale)
+        int +++ "." +++ float +++ scale
 
 instance PrettyPrint L.ASTScaleFactor where
     prettyPrint (sign, num) =
-        'e':(prettyPrint sign) ++ (prettyPrint num)
+        "e" +++ sign +++ num
 
 instance PrettyPrint L.ASTSign where
     prettyPrint L.SignPlus = "+"
