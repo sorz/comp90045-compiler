@@ -153,11 +153,6 @@ instance PrettyPrint P.ASTFormalParameterSection where
 instance PrettyPrint P.ASTIdentifierList where
     prettyPrint = printSepBy ", "
 
--- ASTIdentifier = String
--- Use `id` instead of `show` to avoid quotes ("").
-instance PrettyPrint L.ASTIdentifier where
-    prettyPrint = id
-
 ----------------------
 -- expressions section
 ----------------------
@@ -242,9 +237,6 @@ instance PrettyPrint P.ASTUnsignedConstant where
         where repl '\'' = "''"
               repl c = [c]
 
-instance PrettyPrint L.ASTUnsignedReal where
-    prettyPrint = show -- TODO
-
 --------------------
 -- variables section
 --------------------
@@ -289,6 +281,10 @@ instance PrettyPrint P.ASTConstant where
     prettyPrint (sign, n) =
         (prettyPrint sign) ++ (prettyPrint n)
 
+----------------
+-- lexer section
+-----------------
+
 -- ASTUnsignedInteger = Integer, so we just `show` it.
 instance PrettyPrint L.ASTUnsignedInteger where
     prettyPrint = show
@@ -296,3 +292,22 @@ instance PrettyPrint L.ASTUnsignedInteger where
 instance PrettyPrint P.ASTSign where
     prettyPrint P.SignPlus = "+"
     prettyPrint P.SignMinus = "-"
+
+-- ASTIdentifier = ASTDigitSequence = String
+-- Use `id` instead of `show` to avoid quotes ("").
+instance PrettyPrint String where
+    prettyPrint = id
+
+instance PrettyPrint L.ASTUnsignedReal where
+    prettyPrint (int, Nothing, scale) =
+        (prettyPrint int) ++ (prettyPrint scale)
+    prettyPrint (int, Just float, scale) =
+        (prettyPrint int) ++ '.':(prettyPrint float) ++ (prettyPrint scale)
+
+instance PrettyPrint L.ASTScaleFactor where
+    prettyPrint (sign, num) =
+        'e':(prettyPrint sign) ++ (prettyPrint num)
+
+instance PrettyPrint L.ASTSign where
+    prettyPrint L.SignPlus = "+"
+    prettyPrint L.SignMinus = "-"
