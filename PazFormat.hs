@@ -40,7 +40,8 @@ instance PrettyPrint P.ASTProcedureDeclarationPart where
 -- Instead impl PrettyPrint three times on one type (which is impossible),
 -- use a new function `prettyPrintStatement`.
 instance PrettyPrint P.ASTCompoundStatement where 
-    prettyPrint seq = "begin\n" ++ (prettyPrintStatement seq) ++ "end\n"
+    prettyPrint seq =
+        "begin\n" ++ (prettyPrintStatement seq) ++ "end\n"
 
 prettyPrintStatement :: [ASTStatement] -> String
 prettyPrintStatement [] = ""
@@ -49,13 +50,14 @@ prettyPrintStatement (x:xs) =
 
 instance PrettyPrint P.ASTStatement where 
     prettyPrint (AssignmentStatement s) = prettyPrint s
-    prettyPrint (ProcedureStatement s) = show s
-    prettyPrint (CompoundStatement s) = show s
-    prettyPrint (IfStatement s) = show s
-    prettyPrint (WhileStatement s) = show s
-    prettyPrint (ForStatement s) = show s
+    prettyPrint (ProcedureStatement s) = prettyPrint s
+    prettyPrint (CompoundStatement s) = prettyPrint s
+    prettyPrint (IfStatement s) = prettyPrint s
+    prettyPrint (WhileStatement s) = prettyPrint s
+    prettyPrint (ForStatement s) = prettyPrint s
     prettyPrint (EmptyStatement s) = "(TODO: EmptyStatement)"
 
+-- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 
     prettyPrint (left, expr) =
         (prettyPrint left) ++ " := " ++ (prettyPrint expr)
@@ -64,37 +66,42 @@ instance PrettyPrint P.AssignmentLeft where
     prettyPrint (AssignVariableAccess var) = prettyPrint var
     prettyPrint (AssignIdentifier id) = prettyPrint id
 
---procedure_statement
---identifier [actual_parameter_list]
+-- procedure statement
 instance PrettyPrint P.ASTProcedureStatement where
-    prettyPrint (id, Nothing) = (prettyPrint id) ++ "\n"
-    prettyPrint (id, (Just params)) =
-        (prettyPrint id) ++ (prettyPrint params) ++ "\n"
+    prettyPrint (id, Nothing) = prettyPrint id
+    prettyPrint (id, Just params) =
+        (prettyPrint id) ++ "(" ++ (prettyPrint params) ++ ")"
 
---actual_parameter_list
--- : LEFT_PARENTHESIS expression {COMMA expression} RIGHT_PARENTHESIS
 instance PrettyPrint P.ASTActualParameterList where
-    prettyPrint (expression, []) = "("  ++ expression ++ ")" 
-    prettyPrint (expression, (x:xs)) =
-        "(" ++ (prettyPrint expression) ++ (prettyPrint x) ++ ";" ++ (prettyPrint xs)  ++ ")"
+    prettyPrint (a:[]) = prettyPrint a 
+    prettyPrint (a:b:xs) =
+        (prettyPrint a) ++ ", " ++ (prettyPrint (b:xs))
 
+-- while statement
 instance PrettyPrint P.ASTWhileStatement where
-    prettyPrint (expression, statement) =
-        "while " ++ expression ++ " do" ++ statement ++ "\n"
+    prettyPrint (expr, stat) =
+        "while " ++ (prettyPrint expr) ++ " do\n" ++
+        (prettyPrint stat)
     
+-- if statement
 instance PrettyPrint P.ASTIfStatement where 
-    prettyPrint (expression, statement1, Nothing) =
-        "if " ++ (prettyPrint expression) ++ " then" ++ statement1 ++ "\n"
-    prettyPrint (expression, statement1, (Just statement2)) =
-        "if " ++ (prettyPrint expression) ++ " then" ++ statement1 ++ "\n" ++ statement2
+    prettyPrint (expr, stat1, Nothing) =
+        "if " ++ (prettyPrint expr) ++ " then\n" ++
+        (prettyPrint stat1)
+    prettyPrint (expr, stat1, (Just stat2)) =
+        (prettyPrint ((expr, stat1, Nothing) :: ASTIfStatement)) ++
+        "else\n" ++ (prettyPrint stat2)
 
--- for_statement
--- FOR identifier ASSIGN expression (TO | DOWN_TO) expression DO statement
+-- for statement
 instance PrettyPrint P.ASTForStatement where 
-    prettyPrint (id , expression1, (ForTo x), expression2, statement) = 
-          "for" ++ id ++ " = " ++ expression ++ x ++ expression ++ "\n"
-    prettyPrint (id, expression, expression, (To y), statement) =
-          "for" ++ id ++ " = " ++ expression ++ y ++ statement ++ "\n"
+    prettyPrint (id , expr1, to, expr2, stat) = 
+          "for " ++ (prettyPrint id) ++ " := " ++ (prettyPrint expr1) ++
+          (prettyPrint to) ++ (prettyPrint expr2) ++ "do" ++
+          (prettyPrint stat)
+
+instance PrettyPrint P.ForDirection where
+    prettyPrint ForTo = " to "
+    prettyPrint ForDownTo = " downto "
 
 ---------------------
 -- procedures section
