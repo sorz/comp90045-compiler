@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 
 module PazFormat where
 import PazLexer as L
@@ -11,6 +12,21 @@ class PrettyPrint ast where
 instance PrettyPrint ast => PrettyPrint (Maybe ast) where
     prettyPrint Nothing = ""
     prettyPrint (Just x) = prettyPrint x
+
+
+-- statement with a ident (four space before each lines)
+data Ident stat where
+    Ident :: ASTStatement -> Ident stat
+
+instance PrettyPrint (Ident stat) where
+    prettyPrint (Ident stat) = unlines' (map ident lns) where
+        lns = lines (prettyPrint stat)
+        -- add ident to non-blank line
+        ident "" = ""
+        ident l = "    " ++ l
+        -- like unlines, but without terminating newline
+        unlines' (a:[]) = a
+        unlines' (a:b:xs) = a ++ "\n" ++ (unlines' (b:xs))
 
 ------------------
 -- program section
@@ -46,7 +62,7 @@ instance PrettyPrint P.ASTCompoundStatement where
 prettyPrintStatement :: [ASTStatement] -> String
 prettyPrintStatement [] = ""
 prettyPrintStatement (x:xs) =
-    "    " ++ (prettyPrint x) ++ ";\n" ++ (prettyPrintStatement xs)
+    (prettyPrint (Ident x)) ++ ";\n" ++ (prettyPrintStatement xs)
 
 instance PrettyPrint P.ASTStatement where 
     prettyPrint (AssignmentStatement s) = prettyPrint s
@@ -77,27 +93,34 @@ instance PrettyPrint P.ASTActualParameterList where
     prettyPrint (a:b:xs) =
         (prettyPrint a) ++ ", " ++ (prettyPrint (b:xs))
 
+-- while/if/for statements
+-- print with ident expect CompoundStatement
+printWithOptionIdent :: ASTStatement -> String
+printWithOptionIdent (CompoundStatement s) =
+    prettyPrint (CompoundStatement s)
+printWithOptionIdent s = prettyPrint (Ident s)
+
 -- while statement
 instance PrettyPrint P.ASTWhileStatement where
     prettyPrint (expr, stat) =
         "while " ++ (prettyPrint expr) ++ " do\n" ++
-        (prettyPrint stat)
+        (printWithOptionIdent stat)
     
 -- if statement
 instance PrettyPrint P.ASTIfStatement where 
     prettyPrint (expr, stat1, Nothing) =
         "if " ++ (prettyPrint expr) ++ " then\n" ++
-        (prettyPrint stat1)
+        (printWithOptionIdent stat1)
     prettyPrint (expr, stat1, (Just stat2)) =
         (prettyPrint ((expr, stat1, Nothing) :: ASTIfStatement)) ++
-        "else\n" ++ (prettyPrint stat2)
+        "\nelse\n" ++ (printWithOptionIdent stat2)
 
 -- for statement
 instance PrettyPrint P.ASTForStatement where 
     prettyPrint (id , expr1, to, expr2, stat) = 
           "for " ++ (prettyPrint id) ++ " := " ++ (prettyPrint expr1) ++
           (prettyPrint to) ++ (prettyPrint expr2) ++ "do" ++
-          (prettyPrint stat)
+          (printWithOptionIdent stat)
 
 instance PrettyPrint P.ForDirection where
     prettyPrint ForTo = " to "
