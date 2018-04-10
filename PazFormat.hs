@@ -175,15 +175,15 @@ printExpr p1 expr
 instance PrettyPrint P.ASTExpression where
     prettyPrint (RelOp op expr1 expr2) =
         (printExpr EORel expr1) +++ op +++
-        (printExpr EORel expr2)
+        (printExpr EOAdd expr2)
     prettyPrint (SignOp op expr) =
         op +++ (printExpr EOAdd expr)
     prettyPrint (AddOp op expr1 expr2) =
         (printExpr EOAdd expr1) +++ op +++
-        (printExpr EOAdd expr2)
+        (printExpr EOMul expr2)
     prettyPrint (MulOp op expr1 expr2) =
         (printExpr EOMul expr1) +++ op +++
-        (printExpr EOMul expr2)
+        (printExpr EONot expr2)
     prettyPrint (NotOp expr) =
         "not " ++ (printExpr EONot expr)
     prettyPrint (Const const) = prettyPrint const
@@ -261,7 +261,7 @@ instance PrettyPrint P.ASTTypeIdentifier where
 
 instance PrettyPrint P.ASTArrayType where
     prettyPrint (subTyp, typId) =
-        "array [" +++ subTyp +++ "] of " +++ typId
+        "array[" +++ subTyp +++ "] of " +++ typId
 
 instance PrettyPrint P.ASTSubrangeType where
     prettyPrint (const1, const2) =
