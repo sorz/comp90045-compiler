@@ -13,7 +13,6 @@ instance PrettyPrint ast => PrettyPrint (Maybe ast) where
     prettyPrint Nothing = ""
     prettyPrint (Just x) = prettyPrint x
 
-
 -- statement with a ident (four space before each lines)
 data Ident stat where
     Ident :: ASTStatement -> Ident stat
@@ -28,6 +27,12 @@ instance PrettyPrint (Ident stat) where
         unlines' (a:[]) = a
         unlines' (a:b:xs) = a ++ "\n" ++ (unlines' (b:xs))
 
+-- print list of ast, separated by sep
+printSepBy :: PrettyPrint ast => String -> [ast] -> String
+printSepBy sep (a:[]) = prettyPrint a
+printSepBy sep (a:b:xs) = 
+    (prettyPrint a) ++ sep ++ (printSepBy sep (b:xs))
+
 ------------------
 -- program section
 ------------------
@@ -40,29 +45,23 @@ instance PrettyPrint P.ASTProgram where
     prettyPrint (id, variable, procedure, statement) =
         "program " ++ (prettyPrint id) ++ ";\n\n" ++
         (prettyPrint variable) ++
-        (prettyPrint procedure) ++
-        (prettyPrint statement)
+        (prettyPrint procedure) ++ "\n" ++
+        (prettyPrint statement) ++ "."
 
 instance PrettyPrint P.ASTProcedureDeclarationPart where
     prettyPrint [] = ""
     prettyPrint (x:xs) =
-        (prettyPrint x) ++ "\n" ++ (prettyPrint xs)
+        (prettyPrint x) ++ ";\n" ++ (prettyPrint xs)
 
 --------------------
 -- statement section
 --------------------
 
 -- ASTCompoundStatement = ASTStatementSequence = [ASTStatement]
--- Instead impl PrettyPrint three times on one type (which is impossible),
--- use a new function `prettyPrintStatement`.
 instance PrettyPrint P.ASTCompoundStatement where 
     prettyPrint seq =
-        "begin\n" ++ (prettyPrintStatement seq) ++ "end\n"
-
-prettyPrintStatement :: [ASTStatement] -> String
-prettyPrintStatement [] = ""
-prettyPrintStatement (x:xs) =
-    (prettyPrint (Ident x)) ++ ";\n" ++ (prettyPrintStatement xs)
+        let seq' = map Ident seq in
+            "begin\n" ++ (printSepBy ";\n" seq') ++ "\nend"
 
 instance PrettyPrint P.ASTStatement where 
     prettyPrint (AssignmentStatement s) = prettyPrint s
@@ -82,7 +81,7 @@ instance PrettyPrint P.AssignmentLeft where
     prettyPrint (AssignVariableAccess var) = prettyPrint var
     prettyPrint (AssignIdentifier id) = prettyPrint id
 
--- procedure statement
+-- procedure statement (call)
 instance PrettyPrint P.ASTProcedureStatement where
     prettyPrint (id, Nothing) = prettyPrint id
     prettyPrint (id, Just params) =
@@ -135,15 +134,13 @@ instance PrettyPrint P.ForDirection where
 --         ASTVariableDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProcedureDeclaration where
     prettyPrint (id, param, var, stat) =
-        "procedure " ++ (prettyPrint id) ++
-        "(" ++ (prettyPrint param) ++ ");\n" ++
+        "\nprocedure " ++ (prettyPrint id) ++
+        (prettyPrint param) ++ ";\n" ++
         (prettyPrint var) ++ (prettyPrint stat)
 
 -- ASTFormalParameterList = [ASTFormalParameterSection]
 instance PrettyPrint P.ASTFormalParameterList where
-    prettyPrint (a:[]) = (prettyPrint a)
-    prettyPrint (a:b:xs) =
-        (prettyPrint a) ++ "; " ++ (prettyPrint (b:xs))
+    prettyPrint params = "(" ++ (printSepBy "; " params) ++ ")"
 
 -- ASTFormalParameterSection = (Bool, ASTIdentifierList, ASTTypeDenoter)
 instance PrettyPrint P.ASTFormalParameterSection where
@@ -154,16 +151,12 @@ instance PrettyPrint P.ASTFormalParameterSection where
 
 -- ASTIdentifierList = [ASTIdentifier]
 instance PrettyPrint P.ASTIdentifierList where
-    prettyPrint [] = ""
-    prettyPrint (x:[]) = id x
-    prettyPrint (x:xs) =
-        (prettyPrint x) ++ ", " ++ (prettyPrint xs)
+    prettyPrint = printSepBy ", "
 
 -- ASTIdentifier = String
 -- Use `id` instead of `show` to avoid quotes ("").
 instance PrettyPrint L.ASTIdentifier where
     prettyPrint = id
-
 
 ----------------------
 -- expressions section
@@ -204,6 +197,7 @@ instance PrettyPrint [(P.ASTAddingOperator, P.ASTTerm)] where
 instance PrettyPrint P.ASTAddingOperator where
     prettyPrint Plus = " + "
     prettyPrint Minus = " - "
+    prettyPrint Or = " or "
 
 -- ASTTerm = (ASTFactor, [(ASTMutiplayingOperator, ASTFactor)])
 instance PrettyPrint P.ASTTerm where
@@ -235,7 +229,7 @@ instance PrettyPrint P.ASTVariableAccess where
 -- ASTIndexedVariable = (ASTIdentifier, ASTExpression)
 instance PrettyPrint P.ASTIndexedVariable where
     prettyPrint (id, astExp) = 
-        (prettyPrint id) ++ "(" ++ (prettyPrint astExp) ++ ")"
+        (prettyPrint id) ++ "[" ++ (prettyPrint astExp) ++ "]"
 
 instance PrettyPrint P.ASTUnsignedNumber where
     prettyPrint (UnsignedInteger int) = prettyPrint int
