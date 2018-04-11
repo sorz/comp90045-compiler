@@ -20,7 +20,10 @@ import Text.Parsec.Expr
 import Data.Char
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Control.Monad (void)
+import Control.Monad (
+    void,
+    liftM
+    )
 import Control.Applicative (many) -- get <|> from here too if needed
 import PazLexer (
     ASTLexicalToken,
@@ -680,33 +683,13 @@ parseStatement =
     trace
     "parseStatement"
     (
-        try (do
-            x <- parseAssignmentStatement
-            return (AssignmentStatement x)
-            ) <|>
-        try (do
-            x <- parseProcedureStatement
-            return (ProcedureStatement x)
-            ) <|>
-        try (do
-            x <- parseCompoundStatement
-            return (CompoundStatement x)
-            ) <|>
-        try (do
-            x <- parseIfStatement
-            return (IfStatement x)
-            ) <|>
-        try (do
-            x <- parseWhileStatement
-            return (WhileStatement x)
-            ) <|>
-        try (do
-            x <- parseForStatement
-            return (ForStatement x)
-            ) <|>
-        do
-            x <- parseEmptyStatement
-            return EmptyStatement
+        try (liftM AssignmentStatement parseAssignmentStatement) <|>
+        try (liftM ProcedureStatement parseProcedureStatement) <|>
+        try (liftM CompoundStatement parseCompoundStatement) <|>
+        try (liftM IfStatement parseIfStatement) <|>
+        try (liftM WhileStatement parseWhileStatement) <|>
+        try (liftM ForStatement parseForStatement) <|>
+        (parseEmptyStatement >> return EmptyStatement)
         )
 
 type ASTEmptyStatement = ()
@@ -830,14 +813,8 @@ parseTerm =
             parseTokenRightParenthesis
             return x
             ) <|>
-        try (do
-            x <- parseUnsignedConstant
-            return (Const x)
-            ) <|>
-        try (do
-            x <- parseVariableAccess
-            return (Var x)
-            ) <|>
+        try (liftM Const parseUnsignedConstant) <|>
+        try (liftM Var parseVariableAccess) <|>
         parseExpression
 
 operatorTable = [
@@ -880,13 +857,8 @@ parseVariableAccess :: Parser ASTVariableAccess
 parseVariableAccess =
     trace
         "parseVariableAccess"
-        try (do
-            x <- parseIndexedVariable
-            return (IndexedVariable x)
-            )
-        <|> do
-            x <- parseIdentifier
-            return (Identifier x)
+        try (liftM IndexedVariable parseIndexedVariable)
+        <|>  liftM Identifier parseIdentifier
 
 type ASTIndexedVariable = (ASTIdentifier, ASTExpression)
 parseIndexedVariable :: Parser ASTIndexedVariable
@@ -910,13 +882,8 @@ parseUnsignedNumber :: Parser ASTUnsignedNumber
 parseUnsignedNumber =
     trace
         "parseUnsignedNumber"
-        try (do
-            x <- parseUnsignedInteger
-            return (UnsignedInteger x)
-            )
-        <|> do
-            x <- parseUnsignedReal
-            return (UnsignedReal x)
+        try (liftM UnsignedInteger parseUnsignedInteger)
+        <|>  liftM UnsignedReal parseUnsignedReal
 
 type ASTUnsignedConstant = UnsignedConstant
 data UnsignedConstant =
@@ -927,14 +894,8 @@ parseUnsignedConstant :: Parser ASTUnsignedConstant
 parseUnsignedConstant =
     trace
         "parseUnsignedConstant"
-        try (do
-            x <- parseUnsignedNumber
-            return (UnsignedNumber x)
-            )
-        <|> do
-            x <- parseCharacterString
-            return (CharacterString x)
-
+        try (liftM UnsignedNumber parseUnsignedNumber)
+        <|>  liftM CharacterString parseCharacterString
 
 
 -- your code ends here
