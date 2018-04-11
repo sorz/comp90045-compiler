@@ -716,25 +716,13 @@ parseEmptyStatement =
         "parseEmptyStatement"
         lookAhead (parseTokenEnd <|> parseTokenDot)
 
-type ASTAssignmentStatement = (AssignmentLeft, ASTExpression)
-data AssignmentLeft =
-    AssignVariableAccess ASTVariableAccess |
-    AssignIdentifier ASTIdentifier
-    deriving Show
+type ASTAssignmentStatement = (ASTVariableAccess, ASTExpression)
 parseAssignmentStatement :: Parser ASTAssignmentStatement
 parseAssignmentStatement =
     trace
         "parseExpression"
         (do
-            x0 <- choice [
-                try (do
-                    y <- parseVariableAccess
-                    return (AssignVariableAccess y)
-                    ),
-                do
-                    y <- parseIdentifier
-                    return (AssignIdentifier y)
-                ]
+            x0 <- parseVariableAccess
             parseTokenAssign
             x1 <- parseExpression
             return (x0, x1)

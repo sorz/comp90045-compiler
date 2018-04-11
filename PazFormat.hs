@@ -85,10 +85,6 @@ instance PrettyPrint P.ASTAssignmentStatement where
     prettyPrint (left, expr) =
         left +++ " := " +++ expr
 
-instance PrettyPrint P.AssignmentLeft where
-    prettyPrint (AssignVariableAccess var) = prettyPrint var
-    prettyPrint (AssignIdentifier id) = prettyPrint id
-
 -- procedure statement (call)
 instance PrettyPrint P.ASTProcedureStatement where
     prettyPrint (id, Nothing) = prettyPrint id
