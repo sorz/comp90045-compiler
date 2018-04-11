@@ -789,6 +789,23 @@ parseWhileStatement =
 
 
 -- Expression section
+--
+-- Here we use Text.Parsec.Expr module to build epxression parser.
+-- 
+-- Reference:
+--   https://wiki.haskell.org/Parsing_a_simple_imperative_language
+
+data ASTRelationalOperator =
+    Equal | NotEqual | LessThan | GreaterThan | LessEqual | GreaterEqual
+    deriving Show
+
+data ASTAddingOperator =
+    Plus | Minus | Or
+    deriving Show
+
+data ASTMutiplayingOperator =
+    Times | DivideBy | Div | And
+    deriving Show
 
 data ASTExpression =
     RelOp ASTRelationalOperator ASTExpression ASTExpression |
@@ -800,8 +817,20 @@ data ASTExpression =
     Var ASTVariableAccess
     deriving Show
 
+type UnaryExprParser = Parser (ASTExpression -> ASTExpression)
+type BinaryExprParser =
+    Parser (ASTExpression -> ASTExpression -> ASTExpression)
+
 parseExpression :: Parser ASTExpression
 parseExpression = buildExpressionParser operatorTable parseTerm
+
+operatorTable = [
+        [ Prefix parseNotExpression                   ],
+        [ Infix  parseMutiplayingExpression AssocLeft ],
+        [ Prefix parseSignExpression,
+          Infix  parseAddingExpression      AssocLeft ],
+        [ Infix  parseRelationalExpression  AssocLeft ]
+    ]
 
 parseTerm :: Parser ASTExpression
 parseTerm =
@@ -817,36 +846,40 @@ parseTerm =
         try (liftM Var parseVariableAccess) <|>
         parseExpression
 
-operatorTable = [
-    [ Prefix (parseTokenNot      >> return NotOp) ],
-    [ Infix  (parseTokenTimes    >> return (MulOp Times))    AssocLeft,
-      Infix  (parseTokenDivideBy >> return (MulOp DivideBy)) AssocLeft,
-      Infix  (parseTokenDiv      >> return (MulOp Div))      AssocLeft,
-      Infix  (parseTokenAnd      >> return (MulOp And))      AssocLeft],
-    [ Prefix (parseTokenPlus     >> return (SignOp SignPlus)),
-      Prefix (parseTokenMinus    >> return (SignOp SignMinus)),
-      Infix  (parseTokenPlus     >> return (AddOp Plus))     AssocLeft,
-      Infix  (parseTokenMinus    >> return (AddOp Minus))    AssocLeft,
-      Infix  (parseTokenOr       >> return (AddOp Or))       AssocLeft],
-    [ Infix  (parseTokenEqual    >> return (RelOp Equal))    AssocLeft,
-      Infix  (parseTokenNotEqual >> return (RelOp NotEqual)) AssocLeft,
-      Infix  (parseTokenLessThan >> return (RelOp LessThan)) AssocLeft,
-      Infix  (parseTokenGreaterThan >> return (RelOp GreaterThan)) AssocLeft,
-      Infix  (parseTokenLessThanOrEqual >> return (RelOp LessEqual)) AssocLeft,
-      Infix  (parseTokenGreaterThanOrEqual >> return (RelOp GreaterEqual)) AssocLeft]
-  ]
+parseNotExpression :: UnaryExprParser
+parseNotExpression =
+    parseTokenNot >> return NotOp
 
-data ASTRelationalOperator =
-    Equal | NotEqual | LessThan | GreaterThan | LessEqual | GreaterEqual
-    deriving Show
+parseMutiplayingExpression :: BinaryExprParser
+parseMutiplayingExpression = choice [
+    parseTokenTimes    >> return (MulOp Times),
+    parseTokenDivideBy >> return (MulOp DivideBy),
+    parseTokenDiv      >> return (MulOp Div),
+    parseTokenAnd      >> return (MulOp And)
+    ]
 
-data ASTAddingOperator = 
-    Plus | Minus | Or
-    deriving Show
+parseSignExpression :: UnaryExprParser
+parseSignExpression = choice [
+    parseTokenPlus  >> return (SignOp SignPlus),
+    parseTokenMinus >> return (SignOp SignMinus)
+    ]
 
-data ASTMutiplayingOperator = 
-    Times | DivideBy | Div | And
-    deriving Show
+parseAddingExpression :: BinaryExprParser
+parseAddingExpression = choice [
+    parseTokenPlus   >> return (AddOp Plus),
+    parseTokenMinus  >> return (AddOp Minus),
+    parseTokenOr     >> return (AddOp Or)
+    ]
+
+parseRelationalExpression :: BinaryExprParser
+parseRelationalExpression = choice [
+    parseTokenEqual       >> return (RelOp Equal),
+    parseTokenNotEqual    >> return (RelOp NotEqual),
+    parseTokenLessThan    >> return (RelOp LessThan),
+    parseTokenGreaterThan        >> return (RelOp GreaterThan),
+    parseTokenLessThanOrEqual    >> return (RelOp LessEqual),
+    parseTokenGreaterThanOrEqual >> return (RelOp GreaterEqual)
+    ]
 
 type ASTVariableAccess = VariableAccess
 data VariableAccess =
