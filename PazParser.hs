@@ -789,15 +789,22 @@ parseWhileStatement =
 
 
 -- Expression section
---
--- Here we use Text.Parsec.Expr module to build epxression parser.
--- 
--- Reference:
---   https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
 data ASTRelationalOperator =
     Equal | NotEqual | LessThan | GreaterThan | LessEqual | GreaterEqual
     deriving Show
+
+parseRelationalOperator :: Parser ASTRelationalOperator
+parseRelationalOperator = trace
+    "parseRelationalOperator"
+    choice [
+        parseTokenEqual              >> return Equal,
+        parseTokenNotEqual           >> return NotEqual,
+        parseTokenLessThan           >> return LessThan,
+        parseTokenGreaterThan        >> return GreaterThan,
+        parseTokenLessThanOrEqual    >> return LessEqual,
+        parseTokenGreaterThanOrEqual >> return GreaterEqual
+    ]
 
 data ASTAddingOperator =
     Plus | Minus | Or
@@ -822,14 +829,31 @@ type BinaryExprParser =
     Parser (ASTExpression -> ASTExpression -> ASTExpression)
 
 parseExpression :: Parser ASTExpression
-parseExpression = buildExpressionParser operatorTable parseTerm
+parseExpression = trace
+    "parseExpression"
+    (
+        (try (do
+            e0 <- parseSimpleExpression
+            op <- parseRelationalOperator
+            e1 <- parseSimpleExpression
+            return $ RelOp op e0 e1
+            ))
+        <|> parseSimpleExpression
+    )
+
+-- parse expr without relational ops (simple expr)
+-- use Text.Parsec.Expr module to build that parser
+-- ref. https://wiki.haskell.org/Parsing_a_simple_imperative_language
+parseSimpleExpression :: Parser ASTExpression
+parseSimpleExpression = trace
+    "parseSimpleExpression"
+    buildExpressionParser operatorTable parseTerm
 
 operatorTable = [
         [ Prefix parseNotExpression                   ],
         [ Infix  parseMutiplayingExpression AssocLeft ],
         [ Prefix parseSignExpression,
-          Infix  parseAddingExpression      AssocLeft ],
-        [ Infix  parseRelationalExpression  AssocLeft ]
+          Infix  parseAddingExpression      AssocLeft ]
     ]
 
 parseTerm :: Parser ASTExpression
@@ -838,48 +862,45 @@ parseTerm =
         "parseTerm"
         try (do
             parseTokenLeftParenthesis
+            -- expr (not simple expr) to allow relational ops
             x <- parseExpression
             parseTokenRightParenthesis
             return x
             ) <|>
         try (liftM Const parseUnsignedConstant) <|>
-        try (liftM Var parseVariableAccess) <|>
-        parseExpression
+        try (liftM Var parseVariableAccess)
 
 parseNotExpression :: UnaryExprParser
-parseNotExpression =
+parseNotExpression = trace
+    "parseNotExpression"
     parseTokenNot >> return NotOp
 
 parseMutiplayingExpression :: BinaryExprParser
-parseMutiplayingExpression = choice [
-    parseTokenTimes    >> return (MulOp Times),
-    parseTokenDivideBy >> return (MulOp DivideBy),
-    parseTokenDiv      >> return (MulOp Div),
-    parseTokenAnd      >> return (MulOp And)
-    ]
+parseMutiplayingExpression = trace
+    "parseMutiplayingExpression"
+    choice [
+        parseTokenTimes    >> return (MulOp Times),
+        parseTokenDivideBy >> return (MulOp DivideBy),
+        parseTokenDiv      >> return (MulOp Div),
+        parseTokenAnd      >> return (MulOp And)
+        ]
 
 parseSignExpression :: UnaryExprParser
-parseSignExpression = choice [
-    parseTokenPlus  >> return (SignOp SignPlus),
-    parseTokenMinus >> return (SignOp SignMinus)
-    ]
+parseSignExpression = trace
+    "parseSignExpression"
+    choice [
+        parseTokenPlus  >> return (SignOp SignPlus),
+        parseTokenMinus >> return (SignOp SignMinus)
+        ]
 
 parseAddingExpression :: BinaryExprParser
-parseAddingExpression = choice [
-    parseTokenPlus   >> return (AddOp Plus),
-    parseTokenMinus  >> return (AddOp Minus),
-    parseTokenOr     >> return (AddOp Or)
-    ]
-
-parseRelationalExpression :: BinaryExprParser
-parseRelationalExpression = choice [
-    parseTokenEqual       >> return (RelOp Equal),
-    parseTokenNotEqual    >> return (RelOp NotEqual),
-    parseTokenLessThan    >> return (RelOp LessThan),
-    parseTokenGreaterThan        >> return (RelOp GreaterThan),
-    parseTokenLessThanOrEqual    >> return (RelOp LessEqual),
-    parseTokenGreaterThanOrEqual >> return (RelOp GreaterEqual)
-    ]
+parseAddingExpression = trace
+    "parseAddingExpression"
+    choice [
+        parseTokenPlus   >> return (AddOp Plus),
+        parseTokenMinus  >> return (AddOp Minus),
+        parseTokenOr     >> return (AddOp Or)
+        ]
 
 type ASTVariableAccess = VariableAccess
 data VariableAccess =
