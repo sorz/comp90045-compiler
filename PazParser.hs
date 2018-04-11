@@ -644,9 +644,9 @@ parseProcedureDeclarationPart =
 
 -- your code starts here
 
--- the following is a dummy implementation that you can delete
--- the dummy implementation simply scans and skips tokens between BEGIN and
--- END (it also skips anything that looks like a nested BEGIN and END block)
+---------------------
+-- statements section
+---------------------
 
 type ASTCompoundStatement = ASTStatementSequence
 parseCompoundStatement :: Parser ASTCompoundStatement
@@ -730,26 +730,24 @@ parseIfStatement =
 
 type ASTProcedureStatement = (ASTIdentifier, Maybe ASTActualParameterList)
 parseProcedureStatement :: Parser ASTProcedureStatement
-parseProcedureStatement =
-    trace
-        "parseProcedureStatement"
-        (do
-            x0 <- parseIdentifier
-            x1 <- optionMaybe (try (parseActualParameterList))
-            return (x0, x1)
-            )
+parseProcedureStatement = trace
+    "parseProcedureStatement"
+    (do
+        x0 <- parseIdentifier
+        x1 <- optionMaybe $ try parseActualParameterList
+        return (x0, x1)
+        )
 
 type ASTActualParameterList = [ASTExpression]
 parseActualParameterList :: Parser ASTActualParameterList
-parseActualParameterList =
-    trace
-        "parseActualParameterList"
-        (do
-            parseTokenLeftParenthesis
-            x <- sepBy1 parseExpression parseTokenComma
-            parseTokenRightParenthesis
-            return x
-            )
+parseActualParameterList = trace
+    "parseActualParameterList"
+    (do
+        parseTokenLeftParenthesis
+        x <- sepBy1 parseExpression parseTokenComma
+        parseTokenRightParenthesis
+        return x
+        )
 
 
 type ASTForStatement = (ASTIdentifier, ASTExpression, ForDirection, ASTExpression, ASTStatement)
@@ -757,38 +755,37 @@ data ForDirection =
     ForTo | ForDownTo
     deriving Show
 parseForStatement :: Parser ASTForStatement
-parseForStatement =
-    trace
-        "parseForStatement"
-        (do
-            parseTokenFor
-            x0 <- parseIdentifier
-            parseTokenAssign
-            x1 <- parseExpression
-            x2 <-
-                (parseTokenTo >> return ForTo) <|>
-                (parseTokenDownTo >> return ForDownTo)
-            x3 <- parseExpression
-            parseTokenDo
-            x4 <- parseStatement
-            return (x0, x1, x2, x3, x4)
-            )
+parseForStatement = trace
+    "parseForStatement"
+    (do
+        parseTokenFor
+        x0 <- parseIdentifier
+        parseTokenAssign
+        x1 <- parseExpression
+        x2 <-
+            (parseTokenTo >> return ForTo) <|>
+            (parseTokenDownTo >> return ForDownTo)
+        x3 <- parseExpression
+        parseTokenDo
+        x4 <- parseStatement
+        return (x0, x1, x2, x3, x4)
+        )
 
 type ASTWhileStatement = (ASTExpression, ASTStatement)
 parseWhileStatement :: Parser ASTWhileStatement
-parseWhileStatement =
-    trace
-        "parseWhileStatement"
-        (do
-            parseTokenWhile
-            x0 <- parseExpression
-            parseTokenDo
-            x1 <- parseStatement
-            return (x0, x1)
-            )
+parseWhileStatement = trace
+    "parseWhileStatement"
+    (do
+        parseTokenWhile
+        x0 <- parseExpression
+        parseTokenDo
+        x1 <- parseStatement
+        return (x0, x1)
+        )
 
-
--- Expression section
+---------------------
+-- expression section
+---------------------
 
 data ASTRelationalOperator =
     Equal | NotEqual | LessThan | GreaterThan | LessEqual | GreaterEqual
@@ -815,19 +812,20 @@ data ASTMutiplayingOperator =
     deriving Show
 
 data ASTExpression =
-    RelOp ASTRelationalOperator ASTExpression ASTExpression |
-    SignOp Sign ASTExpression |
-    AddOp ASTAddingOperator ASTExpression ASTExpression |
-    MulOp ASTMutiplayingOperator ASTExpression ASTExpression |
-    NotOp ASTExpression |
-    Const ASTUnsignedConstant |
-    Var ASTVariableAccess
+    RelOp  ASTRelationalOperator ASTExpression ASTExpression |
+    SignOp ASTSign ASTExpression |
+    AddOp  ASTAddingOperator ASTExpression ASTExpression |
+    MulOp  ASTMutiplayingOperator ASTExpression ASTExpression |
+    NotOp  ASTExpression |
+    Const  ASTUnsignedConstant |
+    Var    ASTVariableAccess
     deriving Show
 
 type UnaryExprParser = Parser (ASTExpression -> ASTExpression)
 type BinaryExprParser =
     Parser (ASTExpression -> ASTExpression -> ASTExpression)
 
+-- parse simple expr with one optional relational op
 parseExpression :: Parser ASTExpression
 parseExpression = trace
     "parseExpression"
@@ -857,18 +855,18 @@ operatorTable = [
     ]
 
 parseTerm :: Parser ASTExpression
-parseTerm =
-    trace
-        "parseTerm"
-        try (do
-            parseTokenLeftParenthesis
-            -- expr (not simple expr) to allow relational ops
-            x <- parseExpression
-            parseTokenRightParenthesis
-            return x
-            ) <|>
-        try (liftM Const parseUnsignedConstant) <|>
-        try (liftM Var parseVariableAccess)
+parseTerm = trace
+    "parseTerm"
+    try (do
+        parseTokenLeftParenthesis
+        -- allow relational ops only here
+        -- (directly within parenthesis)
+        x <- parseExpression
+        parseTokenRightParenthesis
+        return x
+        ) <|>
+    try (liftM Const parseUnsignedConstant) <|>
+    try (liftM Var parseVariableAccess)
 
 parseNotExpression :: UnaryExprParser
 parseNotExpression = trace
@@ -907,49 +905,48 @@ data VariableAccess =
     IndexedVariable ASTIndexedVariable |
     Identifier ASTIdentifier
     deriving Show
+
 parseVariableAccess :: Parser ASTVariableAccess
-parseVariableAccess =
-    trace
-        "parseVariableAccess"
-        try (liftM IndexedVariable parseIndexedVariable)
-        <|>  liftM Identifier parseIdentifier
+parseVariableAccess = trace
+    "parseVariableAccess"
+    try (liftM IndexedVariable parseIndexedVariable)
+    <|>  liftM Identifier parseIdentifier
 
 type ASTIndexedVariable = (ASTIdentifier, ASTExpression)
 parseIndexedVariable :: Parser ASTIndexedVariable
-parseIndexedVariable =
-    trace
-        "parseIndexedVariable"
-        (do
-            x0 <- parseIdentifier
-            parseTokenLeftBracket
-            x1 <- parseExpression
-            parseTokenRightBracket
-            return (x0, x1)
-            )
+parseIndexedVariable = trace
+    "parseIndexedVariable"
+    (do
+        x0 <- parseIdentifier
+        parseTokenLeftBracket
+        x1 <- parseExpression
+        parseTokenRightBracket
+        return (x0, x1)
+        )
 
 type ASTUnsignedNumber = UnsignedNumber
 data UnsignedNumber =
     UnsignedInteger ASTUnsignedInteger |
     UnsignedReal ASTUnsignedReal
     deriving Show
+
 parseUnsignedNumber :: Parser ASTUnsignedNumber
-parseUnsignedNumber =
-    trace
-        "parseUnsignedNumber"
-        try (liftM UnsignedInteger parseUnsignedInteger)
-        <|>  liftM UnsignedReal parseUnsignedReal
+parseUnsignedNumber = trace
+    "parseUnsignedNumber"
+    try (liftM UnsignedInteger parseUnsignedInteger)
+    <|>  liftM UnsignedReal parseUnsignedReal
 
 type ASTUnsignedConstant = UnsignedConstant
 data UnsignedConstant =
     UnsignedNumber ASTUnsignedNumber |
     CharacterString ASTCharacterString
     deriving Show
+
 parseUnsignedConstant :: Parser ASTUnsignedConstant
-parseUnsignedConstant =
-    trace
-        "parseUnsignedConstant"
-        try (liftM UnsignedNumber parseUnsignedNumber)
-        <|>  liftM CharacterString parseCharacterString
+parseUnsignedConstant = trace
+    "parseUnsignedConstant"
+    try (liftM UnsignedNumber parseUnsignedNumber)
+    <|>  liftM CharacterString parseCharacterString
 
 
 -- your code ends here
