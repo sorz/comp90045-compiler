@@ -48,9 +48,14 @@ printSepBy sep (a:b:xs) =
 --    ASTProcedureDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProgram where
     prettyPrint (id, variable, procedure, statement) =
-        "program " +++ id +++ ";\n\n" +++
-        variable +++ procedure +++ "\n" +++
-        statement +++ "."
+        "program " +++ id +++ ";\n" +++
+        variableText +++ procedure +++ "\n" +++
+        statement +++ "." where
+        -- extra blank line only if VariableDeclarationPart present
+            variableText = case variable of
+                [] -> ""
+                otherwise -> "\n" +++ variable
+                
 
 instance PrettyPrint P.ASTProcedureDeclarationPart where
     prettyPrint [] = ""
