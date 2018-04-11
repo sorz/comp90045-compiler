@@ -9,4 +9,5 @@ begin
    a := true and false and true or (false or true);
    a := true and false and (true or false or true);
    a := 1 + 2 + 3 <= 4 * 5 * 6;
+   x := -(5 - 2 - 1);
 end.

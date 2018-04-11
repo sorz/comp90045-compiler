@@ -121,7 +121,7 @@ instance PrettyPrint P.ASTIfStatement where
 instance PrettyPrint P.ASTForStatement where 
     prettyPrint (id , expr1, to, expr2, stat) = 
           "for " +++ id +++ " := " +++ expr1 +++ to +++
-          expr2 +++ "do" +++ (printWithOptionIdent stat)
+          expr2 +++ " do\n" +++ (printWithOptionIdent stat)
 
 instance PrettyPrint P.ForDirection where
     prettyPrint ForTo = " to "
@@ -178,7 +178,7 @@ instance PrettyPrint P.ASTExpression where
         (printExpr EORel expr1) +++ op +++
         (printExpr EOAdd expr2)
     prettyPrint (SignOp op expr) =
-        op +++ (printExpr EOAdd expr)
+        op +++ (printExpr EOMul expr)
     prettyPrint (AddOp op expr1 expr2) =
         (printExpr EOAdd expr1) +++ op +++
         (printExpr EOMul expr2)
