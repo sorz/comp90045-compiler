@@ -2,22 +2,36 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 
+-- Module PazFormat contains the implementation of pretty printing.
+--
+-- The module was organized as following:
+--   * Definition of PrettyPrint and helper functions
+--   * Program section
+--   * Statement section
+--   * Procedures section
+--   * Expressions section
+--   * Variables section
+--   * Lexer section
 module PazFormat where
 import PazLexer as L
 import PazParser as P
 
+-- All AST types are instances of PrettyPrint.
 class PrettyPrint ast where
     prettyPrint :: ast -> String
 
+-- Default implementation for (Maybe AST).
 instance PrettyPrint ast => PrettyPrint (Maybe ast) where
     prettyPrint Nothing = ""
     prettyPrint (Just x) = prettyPrint x
 
--- helper to easily print a sequence of things
+-- Helper to easily print a sequence of things.
+-- ast1 +++ ast2 +++ "a string" is equivalent to
+-- (prettyPrint ast1) ++ (prettyPrint ast2) ++ "a string"
 (+++) :: PrettyPrint a => PrettyPrint b => a -> b -> String
 (+++) a b = (prettyPrint a) ++ (prettyPrint b)
 
--- statement with a ident (four space before each lines)
+-- Statement with a ident (four space before each lines).
 data Ident stat where
     Ident :: ASTStatement -> Ident stat
 
@@ -32,7 +46,7 @@ instance PrettyPrint (Ident stat) where
         unlines' (a:[]) = a
         unlines' (a:b:xs) = a ++ "\n" ++ (unlines' (b:xs))
 
--- print list of ast, separated by sep
+-- Print list of ast, separated by sep
 printSepBy :: PrettyPrint ast => String -> [ast] -> String
 printSepBy sep (a:[]) = prettyPrint a
 printSepBy sep (a:b:xs) = 
@@ -55,7 +69,6 @@ instance PrettyPrint P.ASTProgram where
             variableText = case variable of
                 [] -> ""
                 otherwise -> "\n" +++ variable
-                
 
 instance PrettyPrint P.ASTProcedureDeclarationPart where
     prettyPrint [] = ""
@@ -161,6 +174,8 @@ data ExprOpPriority =
     EORel | EOAdd | EOMul | EONot | EONul
     deriving (Show, Eq, Ord)
 
+-- If the priority of expr is lower than p1, print expr inside
+-- parentheses.
 printExpr :: ExprOpPriority -> P.ASTExpression -> String
 printExpr p1 expr
     | p1 > p2   = "(" +++ expr +++ ")"
@@ -176,7 +191,7 @@ printExpr p1 expr
 
 instance PrettyPrint P.ASTExpression where
     prettyPrint (RelOp op expr1 expr2) =
-        (printExpr EORel expr1) +++ op +++
+        (printExpr EOAdd expr1) +++ op +++
         (printExpr EOAdd expr2)
     prettyPrint (SignOp op expr) =
         op +++ (printExpr EOMul expr)

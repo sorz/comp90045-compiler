@@ -1,4 +1,12 @@
 {-# LANGUAGE PackageImports #-}
+-- The entry point (main) of Paz compiler program.
+--
+-- Require following modules:
+--  * PazLexer:  lexer of Paz
+--  * PazParser: synatx parser of Paz
+--  * PazFormat: pretty printing
+--
+-- Written by team Placeholder.
 import Debug.Trace (trace)
 import Text.Parsec (parse, ParseError)
 import PazLexer
