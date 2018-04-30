@@ -1,0 +1,22 @@
+program milestone3;
+
+{ Phase 3 test case
+  If and while statements }
+
+var x: integer;
+
+begin
+    read(x);
+    while (x > 10) and (x < 100) do
+    begin
+        if x < 50 then
+            x := x - 1
+        else
+            x := x + 1
+    end;
+    if x < 50 then
+        write('Went down')
+    else
+        write('Went up');
+    writeln
+end.

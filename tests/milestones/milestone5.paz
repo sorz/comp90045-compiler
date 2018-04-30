@@ -1,0 +1,18 @@
+program milestone5;
+
+{ Phase 5 test case
+  By-reference arguments }
+
+var result: integer;
+
+procedure p(in: integer; var out: integer);
+begin
+    out := 2 * in
+end;
+
+begin
+    p(4, result);
+    write(result);
+    writeln
+end.
+

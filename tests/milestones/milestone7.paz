@@ -1,0 +1,27 @@
+program milestone7;
+
+{ Phase 7 test case
+  For loops }
+
+var k, m, n: integer;
+
+begin
+    k := 0;
+    for n := 1 to 10 do
+        if k >= 0 then
+            k := k + n;
+    write(k);
+    writeln;
+
+    for n := 1 downto 10 do
+        write('bad');
+
+    for m := k downto 55 do
+    begin
+        if m = 55 then
+            write('good')
+        else
+            write('bad');
+        writeln
+    end
+end.

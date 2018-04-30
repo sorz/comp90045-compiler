@@ -1,0 +1,18 @@
+program milestone8;
+
+{ Phase 8 test case
+  Semantic error test }
+
+var a: boolean;
+
+procedure p(var x: real);
+begin
+    write(x);
+    write(' -- Done');
+    writeln
+end;
+
+begin
+    a := false;
+    p(a)
+end.

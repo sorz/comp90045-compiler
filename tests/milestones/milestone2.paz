@@ -1,0 +1,14 @@
+program milestone2;
+
+{ Phase 2 test case
+  Read and assignment statements }
+
+var x: integer;
+    y: real;
+
+begin
+    read(x);
+    y := x;
+    write(x + y);
+    writeln
+end.

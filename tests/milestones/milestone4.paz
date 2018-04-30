@@ -1,0 +1,14 @@
+program milestone4;
+
+{ Phase 4 test case
+  Call by-value arguments and procedure calls }
+
+procedure f(x: integer; y: boolean);
+begin
+    write((x > 4) or y)
+end;
+
+begin
+    f(8, false);
+    writeln
+end.

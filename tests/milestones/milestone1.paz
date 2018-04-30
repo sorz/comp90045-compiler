@@ -1,0 +1,16 @@
+program milestone1;
+
+{ Phase 1 test case
+  Tests expressions and the write statement }
+
+begin
+    write('     Hello darlings!');
+    writeln;
+    write(' ');
+    writeln;
+    write('QUIZ: When real, nine is: ');
+    write(3.0 + 3 * 2);
+    writeln;
+    write((9 = 4 + 5) and true);
+    writeln
+end.
