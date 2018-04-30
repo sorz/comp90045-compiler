@@ -35,6 +35,10 @@ procedure_declaration_part
 
 statement
     : assignment_statement
+    | read_statement
+    | write_statement
+    | write_string_statement
+    | writeln_statement
     | procedure_statement -- must go after assignment_statement
     | compound_statement
     | if_statement
@@ -48,7 +52,23 @@ empty_statement
     ;
 
 assignment_statement
-    : (variable_access | identifier) ASSIGN expression
+    : variable_access ASSIGN expression
+    ;
+
+read_statement
+    : READ LEFT_PARENTHESIS variable_access RIGHT_PARENTHESIS
+    ;
+
+write_statement
+    : WRITE LEFT_PARENTHESIS expression RIGHT_PARENTHESIS
+    ;
+
+write_string_statement
+    : WRITE LEFT_PARENTHESIS character_string RIGHT_PARENTHESIS
+    ;
+
+writeln_statement
+    : WRITELN
     ;
 
 -- this means the call to a procedure
@@ -124,13 +144,14 @@ factor
     ;
 
 unsigned_constant
-    : unsigned_number
-    | character_string
+    : boolean_constant
+    | unsigned_integer
+    | unsigned_real
     ;
 
-unsigned_number
-    : unsigned_integer
-    | unsigned_real
+boolean_constant
+    : FALSE
+    | TRUE
     ;
 
 variable_access
