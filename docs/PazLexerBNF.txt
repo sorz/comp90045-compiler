@@ -72,6 +72,7 @@ lexical_token
     --| DOWN_TO
     --| ELSE
     --| END
+    --| FALSE
     --| FOR
     --| FUNCTION
     --| IF
@@ -81,11 +82,15 @@ lexical_token
     --| OR
     --| PROCEDURE
     --| PROGRAM
+    --| READ
     --| REAL
     --| THEN
     --| TO
+    --| TRUE
     --| VAR
     --| WHILE
+    --| WRITE
+    --| WRITELN
     | character_string
     | identifier
     | unsigned_real
@@ -211,6 +216,10 @@ RIGHT_BRACKET
 --    : "end"
 --    ;
 
+--FALSE
+--    : "false"
+--    ;
+
 --FOR
 --    : "for"
 --    ;
@@ -247,6 +256,10 @@ RIGHT_BRACKET
 --    : "program"
 --    ;
 
+--READ
+--    : "read"
+--    ;
+
 --REAL
 --    : "real"
 --    ;
@@ -259,12 +272,24 @@ RIGHT_BRACKET
 --    : "to"
 --    ;
 
+--TRUE
+--    : "true"
+--    ;
+
 --VAR
 --    : "var"
 --    ;
 
 --WHILE
 --    : "while"
+--    ;
+
+--WRITE
+--    : "write"
+--    ;
+
+--WRITELN
+--    : "writeln"
 --    ;
 
 character_string
@@ -306,6 +331,7 @@ unsigned_real
 
 E
     : "e"
+    | "E"
     ;
 
 scale_factor
