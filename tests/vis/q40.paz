@@ -1,0 +1,17 @@
+program q40;
+
+var n: real;
+
+procedure f(x: real);
+begin
+    x := x + 1;
+    write(x);
+    writeln
+end;
+
+begin
+    n := 41;
+    f(n);
+    write(n);
+    writeln
+end.

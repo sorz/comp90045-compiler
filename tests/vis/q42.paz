@@ -1,0 +1,10 @@
+program q42;
+
+var a: array[1..2] of integer;
+
+begin
+    a[2] := 42;
+    a[1] := a[2];
+    write(a[1]);
+    writeln
+end.

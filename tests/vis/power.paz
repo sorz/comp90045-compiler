@@ -1,0 +1,31 @@
+program power;
+
+var x: real;
+    result: real;
+    n: integer;
+
+procedure power(x: real; n: integer; var out: real);
+    var res: real;
+begin
+    if n = 1 then
+        out := x
+    else
+    begin
+        power(x*x, n div 2, res);
+        if 2*(n div 2) = n then
+            out := res          { n was even }
+        else
+            out := x * res      { n was odd }
+    end
+end;
+
+begin
+    write('Float x: ');
+    read(x);
+    write('Positive integer n: ');
+    read(n);
+    power(x, n, result);
+    write('x^n is: ');
+    write(result);
+    writeln
+end.

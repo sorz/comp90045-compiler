@@ -1,0 +1,44 @@
+program stddev;
+
+{ Compute the mean and variance of a list of numbers }
+
+    var
+        x: real;
+        sum: real;
+        sumsq: real;
+        mean: real;
+
+        count: integer;
+        done: boolean;
+
+begin
+    write('Type a list of floats, ending with a negative number');
+    writeln;
+
+    read(x);
+    count := 0;
+    sum := 0;
+    sumsq := 0;
+    if x < 0 then
+        done := true
+    else
+        done := false;
+    while not done do
+    begin
+        count := count + 1;
+        sum := sum + x;
+        sumsq := sumsq + x*x;
+        read(x);
+        if x < 0 then
+            done := true
+        else
+            done := false
+    end;
+    mean := sum / count;
+    write('The mean is ');
+    write(mean);
+    writeln;
+    write('The variance is ');
+    write(sumsq / count - mean * mean);
+    writeln
+end.

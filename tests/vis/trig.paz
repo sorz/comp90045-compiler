@@ -1,0 +1,103 @@
+program trig;
+
+{ Implementations of sin and cos using Taylor series expansion (E. Brumley) }
+
+var testValue, sinOutput, cosOutput: real;
+
+{ Calculate sin to approx 4 significant digits using Taylor series }
+procedure sin(x: real; var out: real);
+    var i, numIterations: integer;
+        total, numerator, denominator, multiplier: real;
+
+begin
+    numIterations := 12;
+    total := 0;
+    i := 0;
+    while (i < numIterations) do
+    begin
+        power(-1,i,numerator);
+        factorial(2*i+1,denominator);
+        power(x,(2*i+1),multiplier);
+        total := total + (numerator / denominator) * multiplier;
+        i := i + 1
+    end;
+    out := total
+end;
+
+{ Calculate cos to approx 4 significant digits using Taylor series }
+procedure cos(x: real; var out: real);
+    var i, numIterations: integer;
+        total, numerator, denominator, multiplier: real;
+
+begin
+    numIterations := 12;
+    total := 0;
+    i := 0;
+    while (i < numIterations) do
+    begin
+        power(-1,i,numerator);
+        factorial(2*i,denominator);
+        power(x,(2*i),multiplier);
+        total := total + (numerator / denominator) * multiplier;
+        i := i + 1
+    end;
+    out := total
+end;
+  
+{ Calculate x to the power of n }
+procedure power(x: real; n: integer; var out: real);
+    var res: real;
+
+begin
+    if n = 0 then
+        out := 1
+    else
+        if n = 1 then
+            out := x
+        else 
+        begin
+            power(x*x, n div 2, res);
+            if 2*(n div 2) = n then 
+                out := res        { n was even }
+            else 
+                out := x * res    { n was odd }
+        end
+end;
+
+{ Calculate the factorial of x }
+procedure factorial(x: integer; var out: real);
+
+begin
+    if x < 1 then
+        out := 1
+    else 
+    begin
+        out := x;
+        while x > 1 do
+        begin
+            x := x - 1;
+            out := out * x
+        end
+    end
+end;
+
+begin
+    write('Test Value: ');
+    read(testValue);
+    sin(testValue, sinOutput);
+    cos(testValue, cosOutput);
+    writeln;
+
+    write('Sin of ');
+    write(testValue);
+    write(' = ');
+    write(sinOutput);
+    writeln;
+
+    write('Cos of ');
+    write(testValue);
+    write(' = ');
+    write(cosOutput);
+    writeln
+end.
+

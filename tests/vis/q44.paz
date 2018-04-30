@@ -1,0 +1,15 @@
+program q44;
+
+var k: integer;
+
+procedure incr (var n: integer);
+begin
+    n := n + 1
+end;
+
+begin
+    k := 41;
+    incr(k);
+    write(k);
+    writeln
+end.

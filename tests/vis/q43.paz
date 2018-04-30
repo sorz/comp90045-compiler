@@ -1,0 +1,14 @@
+program q43;
+
+procedure p(x: integer; y: integer);
+var a: array [1..2] of integer;
+begin
+    a[x] := 42;
+    a[y] := a[x];
+    write(a[y]);
+    writeln
+end;
+
+begin
+    p(2, 1)
+end.
