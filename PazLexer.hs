@@ -1,6 +1,6 @@
 module PazLexer where
 
-import Debug.Trace (trace)
+--import Debug.Trace (trace)
 import Text.Parsec (
     SourcePos,
     anyChar,
@@ -22,6 +22,10 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad (void)
 import Control.Applicative (many) -- get <|> from here too if needed
+
+-- turn off lexer tracing since stage 1 is now complete
+trace :: x -> y -> y
+trace _ y = y
 
 parseTokenEof :: Parser ()
 parseTokenEof = eof
@@ -148,6 +152,7 @@ data LexicalToken =
     LTDownTo |
     LTElse |
     LTEnd |
+    LTFalse |
     LTFor |
     LTFunction |
     LTIf |
@@ -157,11 +162,15 @@ data LexicalToken =
     LTOr |
     LTProcedure |
     LTProgram |
+    LTRead |
     LTReal |
     LTThen |
     LTTo |
+    LTTrue |
     LTVar |
     LTWhile |
+    LTWrite |
+    LTWriteln |
     LTCharacterString ASTCharacterString |
     LTIdentifier ASTIdentifier |
     LTUnsignedReal ASTUnsignedReal |
@@ -180,6 +189,7 @@ keywordToLexicalToken =
             ("downto", LTDownTo),
             ("else", LTElse),
             ("end", LTEnd),
+            ("false", LTFalse),
             ("for", LTFor),
             ("function", LTFunction),
             ("if", LTIf),
@@ -189,11 +199,15 @@ keywordToLexicalToken =
             ("or", LTOr),
             ("procedure", LTProcedure),
             ("program", LTProgram),
+            ("read", LTRead),
             ("real", LTReal),
             ("then", LTThen),
             ("to", LTTo),
+            ("true", LTTrue),
             ("var", LTVar),
-            ("while", LTWhile)
+            ("while", LTWhile),
+            ("write", LTWrite),
+            ("writeln", LTWriteln)
         ]
 parseLexicalToken :: Parser ASTLexicalToken
 parseLexicalToken =
@@ -569,14 +583,15 @@ parseIdentifier =
                 return (x0 : x1)
             )
 
-type ASTUnsignedInteger = Integer
+type ASTUnsignedInteger = Int
 parseUnsignedInteger :: Parser ASTUnsignedInteger
 parseUnsignedInteger =
     trace
         "parseUnsignedInteger"
-        (do
-            x <- parseDigitSequence
-            return (read x :: Integer)
+        (
+            do
+                x <- parseDigitSequence
+                return (read x)
             )
 
 type ASTDigitSequence = [ASTDigit]
@@ -597,7 +612,7 @@ parseDigitSequence =
                 return (x0 : x1)
             )
 
-type ASTUnsignedReal = (ASTDigitSequence, (Maybe ASTDigitSequence), (Maybe ASTScaleFactor))
+type ASTUnsignedReal = Double
 parseUnsignedReal :: Parser ASTUnsignedReal
 parseUnsignedReal =
     trace
@@ -622,7 +637,17 @@ parseUnsignedReal =
                                             return x0
                                         )
                                     )
-                            return (x0, Just x1, x2)
+                            return (
+                                read (
+                                    x0 ++
+                                        "." ++
+                                        x1 ++
+                                        case x2 of
+                                            Just (Just SignMinus, x) -> "e-" ++ x
+                                            Just (_, x) -> "e" ++ x
+                                            Nothing -> ""
+                                    )
+                                )
                         ),
                     do
                         x0 <-
@@ -630,7 +655,14 @@ parseUnsignedReal =
                         parseTokenE
                         x1 <-
                             parseScaleFactor
-                        return (x0, Nothing, Just x1)
+                        return (
+                            read (
+                                x0 ++
+                                    case x1 of
+                                        (Just SignMinus, x) -> "e-" ++ x
+                                        (_, x) -> "e" ++ x
+                                )
+                            )
                     ]
             )
 
@@ -639,7 +671,13 @@ parseTokenE =
     trace
         "parseTokenE"
         (
-            void (string "e")
+            choice
+                [
+                    try (
+                        void (string "e")
+                        ),
+                    void (string "E")
+                    ]
             )
 
 type ASTScaleFactor = ((Maybe ASTSign), ASTDigitSequence)

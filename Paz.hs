@@ -7,7 +7,6 @@
 --  * PazFormat: pretty printing
 --
 -- Written by team Placeholder.
-import Debug.Trace (trace)
 import Text.Parsec (parse, ParseError)
 import PazLexer
 import PazParser

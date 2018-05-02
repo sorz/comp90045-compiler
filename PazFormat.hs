@@ -92,6 +92,13 @@ instance PrettyPrint P.ASTStatement where
     prettyPrint (WhileStatement s) = prettyPrint s
     prettyPrint (ForStatement s) = prettyPrint s
     prettyPrint EmptyStatement = ""
+    prettyPrint (ReadStatement s) = "read(" +++ s +++ ")"
+    prettyPrint (WriteStatement s) = "write(" +++ s +++ ")"
+    prettyPrint (WritelnStatement) = "writeln"
+    prettyPrint (WriteStringStatement s) =
+        "write('" ++ (concatMap repl s) ++ "')"
+        where repl '\'' = "''"
+              repl c = [c]
 
 -- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 
@@ -234,16 +241,10 @@ instance PrettyPrint P.ASTIndexedVariable where
     prettyPrint (id, astExp) = 
         id +++ "[" +++ astExp +++ "]"
 
-instance PrettyPrint P.ASTUnsignedNumber where
+instance PrettyPrint P.ASTUnsignedConstant where
+    prettyPrint (Boolean bool) = show bool
     prettyPrint (UnsignedInteger int) = prettyPrint int
     prettyPrint (UnsignedReal real) = prettyPrint real
-
-instance PrettyPrint P.ASTUnsignedConstant where
-    prettyPrint (UnsignedNumber num) = prettyPrint num
-    prettyPrint (CharacterString str) =
-        "'" ++ (concatMap repl (prettyPrint str)) ++ "'"
-        where repl '\'' = "''"
-              repl c = [c]
 
 --------------------
 -- variables section
@@ -306,10 +307,7 @@ instance PrettyPrint String where
     prettyPrint = id
 
 instance PrettyPrint L.ASTUnsignedReal where
-    prettyPrint (int, Nothing, scale) =
-        int +++ scale
-    prettyPrint (int, Just float, scale) =
-        int +++ "." +++ float +++ scale
+    prettyPrint = show
 
 instance PrettyPrint L.ASTScaleFactor where
     prettyPrint (sign, num) =

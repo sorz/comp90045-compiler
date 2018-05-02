@@ -1,6 +1,5 @@
 module PazParser where
 
-import Debug.Trace (trace)
 import Text.Parsec (
     Parsec,
     SourcePos,
@@ -31,7 +30,8 @@ import PazLexer (
     ASTCharacterString,
     ASTIdentifier,
     ASTUnsignedInteger,
-    ASTUnsignedReal
+    ASTUnsignedReal,
+    trace
     )
 
 -- define a parser which parses an incoming stream of ASTLexicalToken,
@@ -387,6 +387,17 @@ parseTokenEnd =
             )
         )
 
+parseTokenFalse :: Parser ()
+parseTokenFalse =
+    void (
+        satisfy (
+            \x ->
+                case x of
+                    LTFalse -> True
+                    otherwise -> False
+            )
+        )
+
 parseTokenFor :: Parser ()
 parseTokenFor =
     void (
@@ -486,6 +497,17 @@ parseTokenProgram =
             )
         )
 
+parseTokenRead :: Parser ()
+parseTokenRead =
+    void (
+        satisfy (
+            \x ->
+                case x of
+                    LTRead -> True
+                    otherwise -> False
+            )
+        )
+
 parseTokenReal :: Parser ()
 parseTokenReal =
     void (
@@ -519,6 +541,17 @@ parseTokenTo =
             )
         )
 
+parseTokenTrue :: Parser ()
+parseTokenTrue =
+    void (
+        satisfy (
+            \x ->
+                case x of
+                    LTTrue -> True
+                    otherwise -> False
+            )
+        )
+
 parseTokenVar :: Parser ()
 parseTokenVar =
     void (
@@ -537,6 +570,28 @@ parseTokenWhile =
             \x ->
                 case x of
                     LTWhile -> True
+                    otherwise -> False
+            )
+        )
+
+parseTokenWrite :: Parser ()
+parseTokenWrite =
+    void (
+        satisfy (
+            \x ->
+                case x of
+                    LTWrite -> True
+                    otherwise -> False
+            )
+        )
+
+parseTokenWriteln :: Parser ()
+parseTokenWriteln =
+    void (
+        satisfy (
+            \x ->
+                case x of
+                    LTWriteln -> True
                     otherwise -> False
             )
         )
@@ -671,6 +726,10 @@ parseStatementSequence =
 type ASTStatement = Statement
 data Statement = 
     AssignmentStatement ASTAssignmentStatement |
+    ReadStatement ASTReadStatement |
+    WriteStatement ASTWriteStatement |
+    WriteStringStatement ASTWriteStringStatement |
+    WritelnStatement |
     ProcedureStatement ASTProcedureStatement |
     CompoundStatement ASTCompoundStatement |
     IfStatement ASTIfStatement |
@@ -684,6 +743,10 @@ parseStatement =
     "parseStatement"
     (
         try (liftM AssignmentStatement parseAssignmentStatement) <|>
+        try (liftM ReadStatement parseReadStatement) <|>
+        try (liftM WriteStatement parseWriteStatement) <|>
+        try (liftM WriteStringStatement parseWriteStringStatement) <|>
+        try (parseWritelnStatement >> return WritelnStatement ) <|>
         try (liftM ProcedureStatement parseProcedureStatement) <|>
         try (liftM CompoundStatement parseCompoundStatement) <|>
         try (liftM IfStatement parseIfStatement) <|>
@@ -710,6 +773,50 @@ parseAssignmentStatement =
             x1 <- parseExpression
             return (x0, x1)
         )
+
+type ASTReadStatement = ASTVariableAccess
+parseReadStatement :: Parser ASTReadStatement
+parseReadStatement =
+    trace
+        "parseReadStatement"
+        (do
+            parseTokenRead
+            parseTokenLeftParenthesis
+            x0 <- parseVariableAccess
+            parseTokenRightParenthesis
+            return x0
+        )
+
+type ASTWriteStatement = ASTExpression
+parseWriteStatement :: Parser ASTWriteStatement
+parseWriteStatement =
+    trace
+        "parseWriteStatement"
+        (do
+            parseTokenWrite
+            parseTokenLeftParenthesis
+            x0 <- parseExpression
+            parseTokenRightParenthesis
+            return x0
+        )
+
+type ASTWriteStringStatement = ASTCharacterString
+parseWriteStringStatement :: Parser ASTWriteStringStatement
+parseWriteStringStatement =
+    trace
+        "parseWriteStringStatement"
+        (do
+            parseTokenWrite
+            parseTokenLeftParenthesis
+            x0 <- parseCharacterString
+            parseTokenRightParenthesis
+            return x0
+        )
+
+type ASTWritelnStatement = ()
+parseWritelnStatement :: Parser ASTWritelnStatement
+parseWritelnStatement =
+    trace "parseWritelnStatement" parseTokenWriteln
 
 type ASTIfStatement = (ASTExpression, ASTStatement, Maybe ASTStatement)
 parseIfStatement :: Parser ASTIfStatement
@@ -924,30 +1031,26 @@ parseIndexedVariable = trace
         return (x0, x1)
         )
 
-type ASTUnsignedNumber = UnsignedNumber
-data UnsignedNumber =
-    UnsignedInteger ASTUnsignedInteger |
-    UnsignedReal ASTUnsignedReal
-    deriving Show
-
-parseUnsignedNumber :: Parser ASTUnsignedNumber
-parseUnsignedNumber = trace
-    "parseUnsignedNumber"
-    try (liftM UnsignedInteger parseUnsignedInteger)
-    <|>  liftM UnsignedReal parseUnsignedReal
+type ASTBooleanConstant = Bool
+parseBooleanConstant :: Parser ASTBooleanConstant
+parseBooleanConstant = trace
+    "parseBooleanConstant"
+    try (parseTokenFalse >> return False)
+    <|> (parseTokenTrue >> return True)
 
 type ASTUnsignedConstant = UnsignedConstant
 data UnsignedConstant =
-    UnsignedNumber ASTUnsignedNumber |
-    CharacterString ASTCharacterString
+    Boolean ASTBooleanConstant |
+    UnsignedInteger ASTUnsignedInteger |
+    UnsignedReal ASTUnsignedReal
     deriving Show
 
 parseUnsignedConstant :: Parser ASTUnsignedConstant
 parseUnsignedConstant = trace
     "parseUnsignedConstant"
-    try (liftM UnsignedNumber parseUnsignedNumber)
-    <|>  liftM CharacterString parseCharacterString
-
+    try (liftM Boolean parseBooleanConstant)
+    <|>  try (liftM UnsignedInteger parseUnsignedInteger)
+    <|>  liftM UnsignedReal parseUnsignedReal
 
 -- your code ends here
 
