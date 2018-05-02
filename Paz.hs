@@ -11,6 +11,7 @@ import Text.Parsec (parse, ParseError)
 import PazLexer
 import PazParser
 import PazFormat
+import PazCompiler
 import System.IO (hPutStrLn, stderr)
 import System.Exit (exitFailure)
 import System.Environment (getArgs)
@@ -63,7 +64,12 @@ getASTFromFile file = do
 -- Compile the source file. Unimplemented in stage 1.
 compile :: String -> IO()
 compile file = do
-    die "Sorry, cannot generate code yet"
+    result <- getASTFromFile file
+    case result of
+        LexcialError _ -> die (show result)
+        SyntaxError _ -> die (show result)
+        Ok ast ->
+            putStrLn (PazCompiler.compileStartSymbol ast)
 
 -- Pretty print the source file.
 prettyPrint :: String -> IO()
