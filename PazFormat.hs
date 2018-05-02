@@ -153,7 +153,7 @@ instance PrettyPrint P.ForDirection where
 ---------------------
 
 -- ASTProcedureDeclaration =
---     (ASTIdentifier, (Maybe ASTFormalParameterList),
+--     (ASTIdentifier, ASTFormalParameterList,
 --         ASTVariableDeclarationPart, ASTCompoundStatement)
 instance PrettyPrint P.ASTProcedureDeclaration where
     prettyPrint (id, param, var, stat) =
@@ -162,6 +162,7 @@ instance PrettyPrint P.ASTProcedureDeclaration where
 
 -- ASTFormalParameterList = [ASTFormalParameterSection]
 instance PrettyPrint P.ASTFormalParameterList where
+    prettyPrint [] = ""
     prettyPrint params = "(" ++ (printSepBy "; " params) ++ ")"
 
 -- ASTFormalParameterSection = (Bool, ASTIdentifierList, ASTTypeDenoter)

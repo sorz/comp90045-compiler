@@ -1054,7 +1054,7 @@ parseUnsignedConstant = trace
 
 -- your code ends here
 
-type ASTProcedureDeclaration = (ASTIdentifier, (Maybe ASTFormalParameterList), ASTVariableDeclarationPart, ASTCompoundStatement)
+type ASTProcedureDeclaration = (ASTIdentifier, ASTFormalParameterList, ASTVariableDeclarationPart, ASTCompoundStatement)
 parseProcedureDeclaration :: Parser ASTProcedureDeclaration
 parseProcedureDeclaration =
     trace
@@ -1065,11 +1065,8 @@ parseProcedureDeclaration =
                 x0 <-
                     parseIdentifier
                 x1 <-
-                    optionMaybe (
-                        try (
-                            parseFormalParameterList
-                            )
-                        )
+                    try (parseFormalParameterList)
+                    <|> (return [])
                 parseTokenSemicolon
                 x2 <-
                     parseVariableDeclarationPart
