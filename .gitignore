@@ -2,6 +2,7 @@ taz_emulator/taz
 taz_emulator/ptaz.c
 taz_emulator/ptaz.h
 taz_emulator/ltaz.c
+*.taz
 
 dist
 dist-*

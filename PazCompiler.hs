@@ -130,5 +130,31 @@ compileCompoundStatement ::
     Int -> Symbols -> ASTCompoundStatement -> (Int, String)
 compileCompoundStatement label symbols [] =
     (label, "")
-compileCompoundStatement label symbols (x : xs) =
-    error "compiling compound statements is not yet implemented"
+compileCompoundStatement label symbols (x : xs) = (label', code)
+    where
+        (label'', code') = compileStatement label symbols x
+        (label', code'') = compileCompoundStatement label'' symbols xs
+        code = code' ++ code''
+
+compileStatement ::
+    Int -> Symbols -> ASTStatement -> (Int, String)
+compileStatement label symbol (WriteStringStatement stat) =
+    compileWriteStringStatement label symbol stat
+compileStatement label symbol WritelnStatement =
+    compileWritelnStatement label symbol
+compileStatement label symbol stat =
+    error "compiling statement is not yet implemented"
+
+compileWriteStringStatement ::
+    Int -> Symbols -> ASTWriteStringStatement -> (Int, String)
+compileWriteStringStatement label symbol str = (label, code)
+    where
+        repl '\'' = "''"
+        repl c = [c]
+        code = "    string_const r0, '" ++ (concatMap repl str) ++ "'\n" ++
+               "    call_builtin print_string\n"
+
+compileWritelnStatement ::
+    Int -> Symbols -> (Int, String)
+compileWritelnStatement label symbol = (label, code)
+    where code = "    call_builtin print_newline\n"
