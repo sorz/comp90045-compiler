@@ -79,6 +79,13 @@ putVariable id var = CodeGen (\(State (procs, vars) lc) ->
         ((), State (procs, vars') lc)
     )
 
+genOp :: String -> [String] -> CodeGen String
+genOp op [] = return $ "    " ++ op ++ "\n"
+genOp op args =
+    return $ "    " ++ op ++ " " ++ (gen args) ++ "\n"
+    where gen (a:[]) = a
+          gen (a:b:xs) = a ++ ", " ++ b
+
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
     let
@@ -171,18 +178,20 @@ compileStatement ::
     ASTStatement -> CodeGen String
 compileStatement (WriteStringStatement stat) =
     compileWriteStringStatement stat
-compileStatement WritelnStatement =
-    compileWritelnStatement
+compileStatement WritelnStatement = compileWritelnStatement
+compileStatement EmptyStatement = return ""
 compileStatement stat =
     error "compiling statement is not yet implemented"
 
 compileWriteStringStatement ::
     ASTWriteStringStatement -> CodeGen String
-compileWriteStringStatement str =
-    let repl '\'' = "''"
-        repl c = [c] in
-    return $ "    string_const r0, '" ++ (concatMap repl str) ++ "'\n" ++
-             "    call_builtin print_string\n"
+compileWriteStringStatement str = do
+    c0 <- genOp "r0" ["'" ++ (concatMap repl str) ++ "'"]
+    c1 <- genOp "call_builtin" ["print_string"]
+    return $ c0 ++ c1
+    where
+        repl '\'' = "''"
+        repl c = [c]
 
 compileWritelnStatement :: CodeGen String
-compileWritelnStatement = return "    call_builtin print_newline\n"
+compileWritelnStatement = genOp "call_builtin" ["print_newline"]
