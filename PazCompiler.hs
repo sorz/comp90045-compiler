@@ -53,8 +53,9 @@ instance Monad CodeGen where
 getState :: CodeGen State
 getState = CodeGen (\st -> (st, st))
 
-runState :: CodeGen a -> State -> (a, State)
-runState (CodeGen gen) state = gen state
+runState :: CodeGen a -> State -> a
+runState (CodeGen gen) state = code where
+    (code, _) = gen state
 
 incLabelCounter :: CodeGen ()
 incLabelCounter =
@@ -66,40 +67,41 @@ nextLabel = do
     incLabelCounter
     return $ "label-" ++ (show counter)
 
+putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
+putProcedure id params = CodeGen (\(State (procs, vars) lc) ->
+    let procs' = Map.insert id params procs in
+        ((), State (procs', vars) lc)
+    )
+
+putVariable :: String -> (Bool, ASTTypeDenoter, Int) -> CodeGen ()
+putVariable id var = CodeGen (\(State (procs, vars) lc) ->
+    let vars' = Map.insert id var vars in
+        ((), State (procs, vars') lc)
+    )
+
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
     let
-        slot = 0
-        symbols = (Map.empty, Map.empty)
-        label = 0
-
-        -- pre-compile the procedure declarations to create a map from
-        -- procedure name to formal parameter list, then really compile
-        symbols' = precompileProcedureDeclarationPart symbols procDecls
-
         state = State (Map.empty, Map.empty) 0
-
-        -- the following is a bit crusty due to the awkward order of declaring
-        -- variables vs. procedures (because variables are meant to be global,
-        -- but aren't in Paz), hence why we use symbols' twice, not symbols''
-        (slot', symbols'') =
-            compileVariableDeclarationPart slot symbols' varDecls
-        (procText, state') =
-            runState (compileProcedureDeclarationPart procDecls) state
-        (bodyText, state'') =
-            runState (compileCompoundStatement bodyStatement) state'
+        gen = do
+            precompileProcedureDeclarationPart procDecls
+            slot <- compileVariableDeclarationPart varDecls
+            procText <- compileProcedureDeclarationPart procDecls
+            bodyText <- compileCompoundStatement bodyStatement
+            return (slot, procText, bodyText)
+        (slot, procText, bodyText) = runState gen state
     in
         "# program " ++ name ++
             "\n    call main\n    halt\n" ++
             procText ++
             "main:\n    push_stack_frame " ++
-            show slot' ++
+            show slot ++
             "\n# begin" ++
             "\n" ++
             bodyText ++
             "# end" ++
             "\n    pop_stack_frame " ++
-            show slot' ++
+            show slot ++
             "\n    return\n"
 
 -- the following pre-compilation functions are intended as an example of
@@ -107,27 +109,20 @@ compileProgram (name, varDecls, procDecls, bodyStatement) =
 -- table (by adding additional state such as the label or slot number and
 -- changing the return type, you can easily modify this to compile things)
 precompileProcedureDeclarationPart ::
-    Symbols -> ASTProcedureDeclarationPart -> Symbols
-precompileProcedureDeclarationPart symbols [] =
-    symbols
-precompileProcedureDeclarationPart symbols (x : xs) =
-    -- the following doesn't actually require a let statement, but when
-    -- you start adding additional parameters and return values it might
-    let
-        symbols' = precompileProcedureDeclaration symbols x
-        symbols'' = precompileProcedureDeclarationPart symbols' xs
-    in
-        symbols''
+    ASTProcedureDeclarationPart -> CodeGen ()
+precompileProcedureDeclarationPart [] = return ()
+precompileProcedureDeclarationPart (x : xs) = do
+    precompileProcedureDeclaration x
+    precompileProcedureDeclarationPart xs
 
 precompileProcedureDeclaration ::
-    Symbols -> ASTProcedureDeclaration -> Symbols
-precompileProcedureDeclaration (procSymbols, varSymbols) (x0, x1, x2, x3) =
-    (Map.insert x0 (precompileFormalParameterList x1) procSymbols, varSymbols)
+    ASTProcedureDeclaration -> CodeGen ()
+precompileProcedureDeclaration (x0, x1, x2, x3) = do
+    putProcedure x0 (precompileFormalParameterList x1)
 
 precompileFormalParameterList ::
     ASTFormalParameterList -> [(Bool, ASTTypeDenoter)]
-precompileFormalParameterList [] =
-    []
+precompileFormalParameterList [] = []
 precompileFormalParameterList (x : xs) =
     precompileFormalParameterSection x ++ precompileFormalParameterList xs
 
@@ -147,10 +142,9 @@ precompileFormalParameterSection (isVar, (x : xs), typeDenoter) =
 -- takes a slot number, a symbol table and an AST fragment
 -- returns the advanced slot number and the updated symbol table
 compileVariableDeclarationPart ::
-    Int -> Symbols -> ASTVariableDeclarationPart -> (Int, Symbols)
-compileVariableDeclarationPart slot symbols [] =
-    (slot, symbols)
-compileVariableDeclarationPart slot symbols (x : xs) =
+    ASTVariableDeclarationPart -> CodeGen Int
+compileVariableDeclarationPart [] = return 0
+compileVariableDeclarationPart (x : xs) =
     error "compiling variable declarations is not yet implemented"
 
 -- compile a list of procedures
