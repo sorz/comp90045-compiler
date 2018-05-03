@@ -1,5 +1,7 @@
 module PazCompiler where
 
+import Control.Applicative
+import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 import PazLexer as L
@@ -28,6 +30,42 @@ type Symbols =
 -- important information (such as current label number) can be threaded
 -- through the functions that implement the various parts of the compiler
 -- (the more advanced students might wish to use a state monad for this)
+type LabelCounter = Int
+data State = State Symbols LabelCounter
+data CodeGen a = CodeGen (State -> (a, State))
+
+instance Functor CodeGen where
+    fmap = Control.Monad.liftM
+
+instance Applicative CodeGen where
+    pure = return
+    (<*>) = Control.Monad.ap
+
+instance Monad CodeGen where
+    return code = CodeGen (\state -> (code, state))
+    CodeGen gen >>= f
+        = CodeGen (\st0 -> let
+                                (code, st1) = gen st0
+                                CodeGen gen' = f code
+                            in gen' st1
+                    )
+
+getState :: CodeGen State
+getState = CodeGen (\st -> (st, st))
+
+runState :: CodeGen a -> State -> (a, State)
+runState (CodeGen gen) state = gen state
+
+incLabelCounter :: CodeGen ()
+incLabelCounter =
+    CodeGen (\(State sym lc) -> ((), State sym (lc+1)))
+
+nextLabel :: CodeGen String
+nextLabel = do
+    State symbols counter <- getState
+    incLabelCounter
+    return $ "label-" ++ (show counter)
+
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
     let
@@ -39,15 +77,17 @@ compileProgram (name, varDecls, procDecls, bodyStatement) =
         -- procedure name to formal parameter list, then really compile
         symbols' = precompileProcedureDeclarationPart symbols procDecls
 
+        state = State (Map.empty, Map.empty) 0
+
         -- the following is a bit crusty due to the awkward order of declaring
         -- variables vs. procedures (because variables are meant to be global,
         -- but aren't in Paz), hence why we use symbols' twice, not symbols''
         (slot', symbols'') =
             compileVariableDeclarationPart slot symbols' varDecls
-        (label', procText) =
-            compileProcedureDeclarationPart label symbols' procDecls
-        (label'', bodyText) =
-            compileCompoundStatement label' symbols'' bodyStatement
+        (procText, state') =
+            runState (compileProcedureDeclarationPart procDecls) state
+        (bodyText, state'') =
+            runState (compileCompoundStatement bodyStatement) state'
     in
         "# program " ++ name ++
             "\n    call main\n    halt\n" ++
@@ -117,44 +157,38 @@ compileVariableDeclarationPart slot symbols (x : xs) =
 -- takes a label number, a symbol table and an AST fragment
 -- returns the advanced label number and the generated code
 compileProcedureDeclarationPart ::
-    Int -> Symbols -> ASTProcedureDeclarationPart -> (Int, String)
-compileProcedureDeclarationPart label symbols [] =
-    (label, "")
-compileProcedureDeclarationPart label symbols (x : xs) =
+    ASTProcedureDeclarationPart -> CodeGen String
+compileProcedureDeclarationPart [] = return ""
+compileProcedureDeclarationPart (x : xs) =
     error "compiling procedure declarations is not yet implemented"
 
 -- compile a list of statements
 -- takes a label number, a symbol table and an AST fragment
 -- returns the advanced label number and the generated code
 compileCompoundStatement ::
-    Int -> Symbols -> ASTCompoundStatement -> (Int, String)
-compileCompoundStatement label symbols [] =
-    (label, "")
-compileCompoundStatement label symbols (x : xs) = (label', code)
-    where
-        (label'', code') = compileStatement label symbols x
-        (label', code'') = compileCompoundStatement label'' symbols xs
-        code = code' ++ code''
+    ASTCompoundStatement -> CodeGen String
+compileCompoundStatement [] = return ""
+compileCompoundStatement (x : xs) = do
+    code0 <- compileStatement x
+    code1 <- compileCompoundStatement xs
+    return $ code0 ++ code1
 
 compileStatement ::
-    Int -> Symbols -> ASTStatement -> (Int, String)
-compileStatement label symbol (WriteStringStatement stat) =
-    compileWriteStringStatement label symbol stat
-compileStatement label symbol WritelnStatement =
-    compileWritelnStatement label symbol
-compileStatement label symbol stat =
+    ASTStatement -> CodeGen String
+compileStatement (WriteStringStatement stat) =
+    compileWriteStringStatement stat
+compileStatement WritelnStatement =
+    compileWritelnStatement
+compileStatement stat =
     error "compiling statement is not yet implemented"
 
 compileWriteStringStatement ::
-    Int -> Symbols -> ASTWriteStringStatement -> (Int, String)
-compileWriteStringStatement label symbol str = (label, code)
-    where
-        repl '\'' = "''"
-        repl c = [c]
-        code = "    string_const r0, '" ++ (concatMap repl str) ++ "'\n" ++
-               "    call_builtin print_string\n"
+    ASTWriteStringStatement -> CodeGen String
+compileWriteStringStatement str =
+    let repl '\'' = "''"
+        repl c = [c] in
+    return $ "    string_const r0, '" ++ (concatMap repl str) ++ "'\n" ++
+             "    call_builtin print_string\n"
 
-compileWritelnStatement ::
-    Int -> Symbols -> (Int, String)
-compileWritelnStatement label symbol = (label, code)
-    where code = "    call_builtin print_newline\n"
+compileWritelnStatement :: CodeGen String
+compileWritelnStatement = return "    call_builtin print_newline\n"
