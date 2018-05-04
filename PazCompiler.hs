@@ -15,27 +15,17 @@ compileStartSymbol :: P.ASTStartSymbol -> String
 compileStartSymbol =
     compileProgram
 
--- the following is a suggestion for how you can maintain the symbol table,
--- the symbol information for procedures and for variables is kept separate
--- (although this isn't a requirement, they can share the same name space
--- if you wish), and put in a pair to make it easy to pass around everywhere
-type Symbols =
-    (
-        -- for each procedure, for each formal parameter, its varness and type
-        Map String [(Bool, ASTTypeDenoter)],
-
-        -- for each variable, its varness, type, and starting slot number
-        Map String (Bool, ASTTypeDenoter, Int)
-        )
-
 -- the following is a suggestion for how your compiler can be structured,
 -- there is no requirement to follow this template but it shows how the
 -- important information (such as current label number) can be threaded
 -- through the functions that implement the various parts of the compiler
 -- (the more advanced students might wish to use a state monad for this)
-type LabelCounter = Int
-type SlotCounter = Int
-data State = State Symbols LabelCounter SlotCounter
+data State = State
+    { procedures   :: Map String [(Bool, ASTTypeDenoter)]
+    , variables    :: Map String (Bool, ASTTypeDenoter, Int)
+    , labelCounter :: Int
+    , slotCounter  :: Int
+    }
 data CodeGen a = CodeGen (State -> (a, State))
 
 instance Functor CodeGen where
@@ -61,30 +51,27 @@ runState :: CodeGen a -> State -> a
 runState (CodeGen gen) state = code where
     (code, _) = gen state
 
-incLabelCounter :: CodeGen ()
-incLabelCounter =
-    CodeGen (\(State sym lc sc) -> ((), State sym (lc+1) sc))
-
 clearSlotCounter :: CodeGen ()
 clearSlotCounter =
-    CodeGen (\(State sym lc _) -> ((), State sym lc 0))
+    CodeGen (\st -> ((), st { slotCounter = 0 }))
 
 nextLabel :: CodeGen String
 nextLabel = do
-    State _ counter _ <- getState
-    incLabelCounter
-    return $ "label-" ++ (show counter)
+    st <- getState
+    CodeGen (\st -> ((), st { labelCounter = (labelCounter st) + 1 }))
+    return $ "label-" ++ (show $ labelCounter st)
 
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
-putProcedure id params = CodeGen (\(State (procs, vars) lc sc) ->
-    let procs' = Map.insert id params procs in
-        ((), State (procs', vars) lc sc)
+putProcedure id params = CodeGen (\st ->
+    let procs = Map.insert id params (procedures st) in
+        ((), st { procedures = procs })
     )
 
 putVariable :: String -> ASTTypeDenoter -> CodeGen ()
-putVariable id typ = CodeGen (\(State (procs, vars) lc sc) ->
-    let vars' = Map.insert id (False, typ, sc) vars in
-        ((), State (procs, vars') lc (sc+1))
+putVariable id typ = CodeGen (\st ->
+    let sc = slotCounter st
+        vars = Map.insert id (False, typ, sc) (variables st) in
+        ((), st { variables = vars, slotCounter = sc + 1 })
     )
 
 genOp :: String -> [String] -> CodeGen String
@@ -97,7 +84,12 @@ genOp op args =
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
     let
-        state = State (Map.empty, Map.empty) 0 0
+        state = State
+            { procedures    = Map.empty
+            , variables     = Map.empty
+            , labelCounter  = 0
+            , slotCounter   = 0
+            }
         gen = do
             precompileProcedureDeclarationPart procDecls
             slot <- compileVariableDeclarationPart varDecls
@@ -159,9 +151,9 @@ precompileFormalParameterSection (isVar, (x : xs), typeDenoter) =
 compileVariableDeclarationPart ::
     ASTVariableDeclarationPart -> CodeGen Int
 compileVariableDeclarationPart [] = do
-    State _ _ sc <- getState
+    st <- getState
     clearSlotCounter
-    return sc
+    return $ slotCounter st
 compileVariableDeclarationPart (x:xs) = do
     compileVariableDeclaration x
     compileVariableDeclarationPart xs
@@ -234,8 +226,8 @@ compileVariableAccess ::
 compileVariableAccess (IndexedVariable var) =
     error "compiling indexed variable access is not yet implemented"
 compileVariableAccess (Identifier id) = do
-    State (_, vars) _ _ <- getState
-    (_, typ, slot) <- return $ vars ! id
+    st <- getState
+    (_, typ, slot) <- return $ (variables st) ! id
     case typ of
         OrdinaryTypeDenoter _ -> return (show slot, typ)
         otherwise -> error $ "variable " ++ id ++
