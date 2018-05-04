@@ -329,7 +329,7 @@ compileExpression (RelOp op expr0 expr1) = do
         Equal        -> "cmp_eq_"
         NotEqual     -> "cmp_ne_"
         LessThan     -> "cmp_lt_"
-        GreaterThan  -> "cmp_gl_"
+        GreaterThan  -> "cmp_gt_"
         LessEqual    -> "cmp_le_"
         GreaterEqual -> "cmp_ge_"
     func1 <- return $ case typ of
@@ -338,7 +338,7 @@ compileExpression (RelOp op expr0 expr1) = do
         otherwise -> error $ "expect integer/real, but boolean found"
     putOp (func0 ++ func1) [r0, r0, r1]
     return (r0, BooleanTypeIdentifier)
--- add op
+-- adding op
 compileExpression (AddOp op expr0 expr1) = do
     (r0, r1, typ) <- unifyTypesInBinaryNumberExpr expr0 expr1
     func <- return $ case (op, typ) of
@@ -350,9 +350,25 @@ compileExpression (AddOp op expr0 expr1) = do
         otherwise -> error "unexpected types in adding operation"
     putOp func [r0, r0, r1]
     return (r0, typ)
-
-compileExpression _ =
-    error "compiling expression is not yet implemented"
+-- mutiplaying op
+compileExpression (MulOp op expr0 expr1) = do
+    (r0, r1, typ) <- unifyTypesInBinaryNumberExpr expr0 expr1
+    func <- case (op, typ) of
+        (And,      BooleanTypeIdentifier) -> return "and"
+        (Times,    IntegerTypeIdentifier) -> return "mul_int"
+        (Times,    RealTypeIdentifier)    -> return "mul_real"
+        (Div,      IntegerTypeIdentifier) -> return "div_int"
+        (DivideBy, RealTypeIdentifier)    -> return "div_real"
+        (DivideBy, IntegerTypeIdentifier) -> do
+            putOp "int_to_real" [r0, r0]
+            putOp "int_to_real" [r1, r1]
+            return "div_real"
+        otherwise -> error "unexpected types in mutiplaying operation"
+    typ' <- return $ case op of
+        DivideBy  -> RealTypeIdentifier
+        otherwise -> typ
+    putOp func [r0, r0, r1]
+    return (r0, typ')
 
 -- helper function for compileExpression:
 -- evaluate two number expressions, convert one of them to real
