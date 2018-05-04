@@ -2,7 +2,10 @@ module PazCompiler where
 
 import Control.Applicative
 import Control.Monad
-import Data.Map (Map)
+import Data.Map (
+    Map,
+    (!)
+    )
 import qualified Data.Map as Map
 import PazLexer as L
 import PazParser as P
@@ -192,17 +195,19 @@ compileCompoundStatement (x : xs) = do
 
 compileStatement ::
     ASTStatement -> CodeGen String
-compileStatement (WriteStringStatement stat) =
-    compileWriteStringStatement stat
+compileStatement (WriteStringStatement s) = compileWriteStringStatement s
+compileStatement (AssignmentStatement s) = compileAssignmentStatement s
 compileStatement WritelnStatement = compileWritelnStatement
 compileStatement EmptyStatement = return ""
 compileStatement stat =
     error "compiling statement is not yet implemented"
 
+-- compile write statement
+
 compileWriteStringStatement ::
     ASTWriteStringStatement -> CodeGen String
 compileWriteStringStatement str = do
-    c0 <- genOp "r0" ["'" ++ (concatMap repl str) ++ "'"]
+    c0 <- genOp "string_const" ["r0", "'" ++ (concatMap repl str) ++ "'"]
     c1 <- genOp "call_builtin" ["print_string"]
     return $ c0 ++ c1
     where
@@ -211,3 +216,41 @@ compileWriteStringStatement str = do
 
 compileWritelnStatement :: CodeGen String
 compileWritelnStatement = genOp "call_builtin" ["print_newline"]
+
+
+-- compile assignment & expression
+
+compileAssignmentStatement ::
+    ASTAssignmentStatement -> CodeGen String
+compileAssignmentStatement (var, expr) = do
+    (rvalue, code0) <- compileExpression expr
+    (lvalue, ltype) <- compileVariableAccess var
+    code1 <- genOp "store" [lvalue, rvalue]
+    return $ code0 ++ code1
+
+-- return (lvalue, type) of the variable access.
+compileVariableAccess ::
+    ASTVariableAccess -> CodeGen (String, ASTTypeDenoter)
+compileVariableAccess (IndexedVariable var) =
+    error "compiling indexed variable access is not yet implemented"
+compileVariableAccess (Identifier id) = do
+    State (_, vars) _ _ <- getState
+    (_, typ, slot) <- return $ vars ! id
+    case typ of
+        OrdinaryTypeDenoter _ -> return (show slot, typ)
+        otherwise -> error $ "variable " ++ id ++
+            " is an array, expecting an ordinary type."
+
+-- return (register, code) of the expression
+compileExpression ::
+    ASTExpression -> CodeGen (String, String)
+compileExpression (P.Const const) = do
+    reg <- return $ "r0"  -- TODO
+    code <- case const of
+        UnsignedInteger x -> genOp "int_const" [reg, show x]
+        UnsignedReal x -> genOp "real_const" [reg, show x]
+        Boolean _ -> error "compiling boolean const is not yet implemented"
+    return (reg, code)
+
+compileExpression _ =
+    error "compiling expression is not yet implemented"
