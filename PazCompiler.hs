@@ -25,6 +25,7 @@ data State = State
     , variables    :: Map String (Bool, ASTTypeDenoter, Int)
     , labelCounter :: Int
     , slotCounter  :: Int
+    , regCounter   :: Int
     , code         :: String
     }
 data CodeGen a = CodeGen (State -> (a, State))
@@ -61,6 +62,15 @@ nextLabel = do
     st <- getState
     CodeGen (\st -> ((), st { labelCounter = (labelCounter st) + 1 }))
     return $ "label-" ++ (show $ labelCounter st)
+
+nextRegister :: CodeGen String
+nextRegister = do
+    st <- getState
+    reg <- return $ regCounter st
+    CodeGen (\st -> ((), st { regCounter = reg + 1 }))
+    if reg > 1023
+        then error "number of registers exceeds 1023"
+        else return $ "r" ++ (show reg)
 
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
 putProcedure id params = CodeGen (\st ->
@@ -102,6 +112,7 @@ compileProgram (name, varDecls, procDecls, bodyStatement) =
             , variables     = Map.empty
             , labelCounter  = 0
             , slotCounter   = 0
+            , regCounter    = 0
             , code          = ""
             }
         gen = do
@@ -208,7 +219,8 @@ compileStatement stat =
 
 compileWriteStringStatement :: ASTWriteStringStatement -> CodeGen ()
 compileWriteStringStatement str = do
-    putOp "string_const" ["r0", "'" ++ (concatMap repl str) ++ "'"]
+    reg <- nextRegister
+    putOp "string_const" [reg, "'" ++ (concatMap repl str) ++ "'"]
     putOp "call_builtin" ["print_string"]
     where
         repl '\'' = "''"
@@ -216,7 +228,6 @@ compileWriteStringStatement str = do
 
 compileWritelnStatement :: CodeGen ()
 compileWritelnStatement = putOp "call_builtin" ["print_newline"]
-
 
 -- compile assignment & expression
 
@@ -243,7 +254,7 @@ compileVariableAccess (Identifier id) = do
 -- return register where the result of expression
 compileExpression :: ASTExpression -> CodeGen String
 compileExpression (P.Const const) = do
-    reg <- return $ "r0"  -- TODO
+    reg <- nextRegister
     case const of
         UnsignedInteger x -> putOp "int_const" [reg, show x]
         UnsignedReal x -> putOp "real_const" [reg, show x]
