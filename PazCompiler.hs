@@ -66,6 +66,9 @@ nextLabel = do
 putLabel :: String -> CodeGen ()
 putLabel l = putCode $ l ++ ":\n"
 
+register :: Int -> String
+register n = "r" ++ (show n)
+
 nextRegister :: CodeGen String
 nextRegister = do
     st <- getState
@@ -73,11 +76,11 @@ nextRegister = do
     CodeGen (\st -> ((), st { regCounter = reg + 1 }))
     if reg > 1023
         then error "number of registers exceeds 1023"
-        else return $ "r" ++ (show reg)
+        else return $ register reg
 
-clearRegisterCounter :: CodeGen ()
-clearRegisterCounter =
-    CodeGen (\st -> ((), st { regCounter = 0 }))
+resetRegisterCounter :: Int -> CodeGen ()
+resetRegisterCounter c =
+    CodeGen (\st -> ((), st { regCounter = c }))
 
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
 putProcedure id params = CodeGen (\st ->
@@ -85,12 +88,26 @@ putProcedure id params = CodeGen (\st ->
         ((), st { procedures = procs })
     )
 
+-- return nth of paramter in given procedure
+getProcedureParameter :: String -> Int -> CodeGen (Bool, ASTTypeDenoter)
+getProcedureParameter id n = do
+    st <- getState
+    -- TODO: readable error message
+    return $ (procedures st) ! id !! n
+
+
 putVariable :: Bool -> String -> ASTTypeDenoter -> CodeGen ()
-putVariable v id typ = CodeGen (\st ->
+putVariable isVar id typ = CodeGen (\st ->
     let sc = slotCounter st
-        vars = Map.insert id (v, typ, sc) (variables st) in
+        vars = Map.insert id (isVar, typ, sc) (variables st) in
         ((), st { variables = vars, slotCounter = sc + 1 })
     )
+
+getVariable :: ASTIdentifier -> CodeGen (Bool, ASTTypeDenoter, Int)
+getVariable id = do
+    st <- getState
+    -- TODO: readable error message
+    return $ (variables st) ! id
 
 clearVariables :: CodeGen ()
 clearVariables =
@@ -250,7 +267,7 @@ compileFormalParameterSection (isVar, (id:ids), typ) = do
     compileFormalParameterSection (isVar, ids, typ)
 
 storeProcedureParamters :: Int -> Int -> CodeGen ()
-storeProcedureParamters 0 _ = clearRegisterCounter
+storeProcedureParamters 0 _ = resetRegisterCounter 0
 storeProcedureParamters left total = do
     reg <- nextRegister
     putOp "store" [show $ total - left, reg]
@@ -263,7 +280,7 @@ compileCompoundStatement :: ASTCompoundStatement -> CodeGen ()
 compileCompoundStatement [] = return ()
 compileCompoundStatement (x : xs) = do
     compileStatement x
-    clearRegisterCounter
+    resetRegisterCounter 0
     compileCompoundStatement xs
 
 compileStatement :: ASTStatement -> CodeGen ()
@@ -316,14 +333,13 @@ compileWritelnStatement = do
 compileReadStatement :: ASTVariableAccess -> CodeGen ()
 compileReadStatement var = do
     putComment "read"
-    (slot, typ) <- compileVariableAccess var
+    typ <- variableType var
     func <- return $ case typ of
         IntegerTypeIdentifier -> "read_int"
         RealTypeIdentifier    -> "read_real"
         BooleanTypeIdentifier -> "read_bool"
     putOp "call_builtin" [func]
-    putOp "store" [slot, "r0"]
-
+    storeVariable var "r0"
 
 -- compile if statement
 compileIfStatement :: ASTIfStatement -> CodeGen ()
@@ -369,20 +385,31 @@ compileBooleanExpression expr = do
 
 compileProcedureStatement :: ASTProcedureStatement -> CodeGen ()
 compileProcedureStatement (id, params) = do
-    compileActualParameterList 0 params
+    compileActualParameterList id 0 params
     -- TODO: check id exist
     putOp "call" [id]
 
-compileActualParameterList :: Int -> ASTActualParameterList -> CodeGen ()
-compileActualParameterList _ [] = return ()
-compileActualParameterList n (x:xs) = do
-    reg <- return $ "r" ++ (show n)
-    (reg', typ) <- compileExpression x
+compileActualParameterList :: String -> Int ->
+    ASTActualParameterList -> CodeGen ()
+compileActualParameterList _ _ [] = return ()
+compileActualParameterList id n (expr:params) = do
+    reg <- return $ register n
+    (isVar, typ) <- getProcedureParameter id n
+    if isVar
+        then do
+            (_, typ', slot) <- case expr of
+                Var (Identifier id) -> getVariable id
+                -- TODO: allow array?
+                otherwise -> error "expected variable as parameter"
+            putOp "load_address" [reg, show slot]
+        else do
+            resetRegisterCounter n
+            (reg', typ') <- compileExpression expr
+            if reg == reg'
+                then return ()
+                else putOp "move" [reg, reg']
     -- TODO: check param types
-    if reg == reg'
-        then return ()
-        else putOp "move" [reg, reg']
-    compileActualParameterList (n+1) xs
+    compileActualParameterList id (n+1) params
 
 -- compile assignment & expression
 
@@ -390,8 +417,8 @@ compileAssignmentStatement ::
     ASTAssignmentStatement -> CodeGen ()
 compileAssignmentStatement (var, expr) = do
     putComment "assignment"
+    ltype <- variableType var
     (rvalue, rtype) <- compileExpression expr
-    (lvalue, ltype) <- compileVariableAccess var
     case (rtype, ltype) of
         (IntegerTypeIdentifier, RealTypeIdentifier) ->
             putOp "int_to_real" [rvalue, rvalue]
@@ -401,23 +428,41 @@ compileAssignmentStatement (var, expr) = do
             error $ "assignment real to boolean variable: " ++ (show var)
         -- TODO: int to bool?
         otherwise -> return ()
-    putOp "store" [lvalue, rvalue]
+    storeVariable var rvalue
 
--- return (lvalue, type) of the variable access.
-compileVariableAccess ::
-    ASTVariableAccess -> CodeGen (String, ASTTypeIdentifier)
-compileVariableAccess (IndexedVariable var) =
-    error "compiling indexed variable access is not yet implemented"
-compileVariableAccess (Identifier id) = do
-    st <- getState
-    (var, typ, slot) <- return $ (variables st) ! id
-    case var of
-        False -> return ()
-        True  -> error "compiling var param is not yet implemented"
-    case typ of
-        OrdinaryTypeDenoter t -> return (show slot, t)
-        otherwise -> error $ "variable " ++ id ++
-            " is an array, expecting an ordinary type."
+-- opeartions about variable access
+
+variableType :: ASTVariableAccess -> CodeGen ASTTypeIdentifier
+variableType (IndexedVariable (id, _)) = variableType (Identifier id)
+variableType (Identifier id) = do
+    (_, typ, _) <- getVariable id
+    return $ case typ of
+        OrdinaryTypeDenoter t -> t
+        ArrayTypeDenoter (_, t) -> t
+
+
+-- store register to a variable access
+storeVariable :: ASTVariableAccess -> String -> CodeGen ()
+storeVariable (IndexedVariable var) reg =
+    error "compiling indexed variable access is not yet implemented"    
+storeVariable (Identifier id) val = do
+    (isVar, _, slot) <- getVariable id
+    if not isVar
+        then putOp "store" [show slot, val]
+        else do
+            addr <- nextRegister
+            putOp "load" [addr, show slot]
+            putOp "store_indirect" [addr, val]
+
+loadVariable :: String -> ASTVariableAccess -> CodeGen ()
+loadVariable reg (IndexedVariable var) = 
+    error "compiling indexed variable access is not yet implemented"    
+loadVariable reg (Identifier id) = do
+    (isVar, _, slot) <- getVariable id
+    putOp "load" [reg, show slot]
+    if isVar
+        then putOp "load_indirect" [reg, reg]
+        else return ()
 
 -- return register where the result of expression, with its type.
 compileExpression :: ASTExpression -> CodeGen (String, ASTTypeIdentifier)
@@ -436,9 +481,9 @@ compileExpression (P.Const const) = do
     return (reg, typ)
 -- var access
 compileExpression (Var var) = do
-    (slot, typ) <- compileVariableAccess var
+    typ <- variableType var
     reg <- nextRegister
-    putOp "load" [reg, slot]
+    loadVariable reg var
     return (reg, typ)
 -- sign op
 compileExpression (SignOp sign expr) = do

@@ -28,5 +28,6 @@ begin
     write('>');
     read(n);
     fib(n, m);
-    writeln(m)
+    write(m);
+    writeln
 end.
