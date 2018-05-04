@@ -235,7 +235,7 @@ compileWriteStringStatement str = do
 
 compileWriteStatement :: ASTWriteStatement -> CodeGen ()
 compileWriteStatement expr = do
-    putComment "write"    
+    putComment "write"
     (reg, typ) <- compileExpression expr
     func <- case typ of
         IntegerTypeIdentifier -> return "print_int"
@@ -247,7 +247,7 @@ compileWriteStatement expr = do
 
 compileWritelnStatement :: CodeGen ()
 compileWritelnStatement = do
-    putComment "write line"    
+    putComment "write line"
     putOp "call_builtin" ["print_newline"]
 
 -- compile assignment & expression
@@ -265,6 +265,7 @@ compileAssignmentStatement (var, expr) = do
             error $ "assignment real to integer variable: " ++ (show var)
         (RealTypeIdentifier, BooleanTypeIdentifier) ->
             error $ "assignment real to boolean variable: " ++ (show var)
+        -- TODO: int to bool?
         otherwise -> return ()
     putOp "store" [lvalue, rvalue]
 
@@ -323,16 +324,7 @@ compileExpression (NotOp expr) = do
     return (reg, typ)
 -- relation op
 compileExpression (RelOp op expr0 expr1) = do
-    (r0, t0) <- compileExpression expr0
-    (r1, t1) <- compileExpression expr1
-    suffix <- case (t0, t1) of
-        (IntegerTypeIdentifier, IntegerTypeIdentifier) -> return "int"
-        (RealTypeIdentifier, RealTypeIdentifier)       -> return "real"        
-        (IntegerTypeIdentifier, RealTypeIdentifier) ->
-            putOp "int_to_real" [r0, r0] >> return "real"
-        (RealTypeIdentifier, IntegerTypeIdentifier) ->
-            putOp "int_to_real" [r1, r1] >> return "real"
-        otherwise -> error $ "relational op in non-boolean type"
+    (r0, r1, typ) <- unifyTypesInBinaryNumberExpr expr0 expr1
     func0 <- return $ case op of
         Equal        -> "cmp_eq_"
         NotEqual     -> "cmp_ne_"
@@ -340,8 +332,46 @@ compileExpression (RelOp op expr0 expr1) = do
         GreaterThan  -> "cmp_gl_"
         LessEqual    -> "cmp_le_"
         GreaterEqual -> "cmp_ge_"
-    putOp (func0 ++ suffix) [r0, r0, r1]
+    func1 <- return $ case typ of
+        IntegerTypeIdentifier -> "int"
+        RealTypeIdentifier    -> "real"
+        otherwise -> error $ "expect integer/real, but boolean found"
+    putOp (func0 ++ func1) [r0, r0, r1]
     return (r0, BooleanTypeIdentifier)
+-- add op
+compileExpression (AddOp op expr0 expr1) = do
+    (r0, r1, typ) <- unifyTypesInBinaryNumberExpr expr0 expr1
+    func <- return $ case (op, typ) of
+        (Plus,  IntegerTypeIdentifier) -> "add_int"
+        (Plus,  RealTypeIdentifier)    -> "add_real"
+        (Minus, IntegerTypeIdentifier) -> "sub_int"
+        (Minus, RealTypeIdentifier)    -> "sub_real"
+        (Or,    BooleanTypeIdentifier) -> "or"
+        otherwise -> error "unexpected types in adding operation"
+    putOp func [r0, r0, r1]
+    return (r0, typ)
 
 compileExpression _ =
     error "compiling expression is not yet implemented"
+
+-- helper function for compileExpression:
+-- evaluate two number expressions, convert one of them to real
+-- on demand. return registers of results and their type.
+unifyTypesInBinaryNumberExpr :: ASTExpression -> ASTExpression ->
+    CodeGen (String, String, ASTTypeIdentifier)
+unifyTypesInBinaryNumberExpr expr0 expr1 = do
+    (r0, t0) <- compileExpression expr0
+    (r1, t1) <- compileExpression expr1
+    typ <- case (t0, t1) of
+        (IntegerTypeIdentifier, IntegerTypeIdentifier) ->
+            return IntegerTypeIdentifier
+        (RealTypeIdentifier, RealTypeIdentifier) ->
+            return RealTypeIdentifier
+        (BooleanTypeIdentifier, BooleanTypeIdentifier) ->
+            return BooleanTypeIdentifier
+        (IntegerTypeIdentifier, RealTypeIdentifier) ->
+            putOp "int_to_real" [r0, r0] >> return RealTypeIdentifier
+        (RealTypeIdentifier, IntegerTypeIdentifier) ->
+            putOp "int_to_real" [r1, r1] >> return RealTypeIdentifier
+        otherwise -> error $ "mixed number & boolean in expression"
+    return (r0, r1, typ)
