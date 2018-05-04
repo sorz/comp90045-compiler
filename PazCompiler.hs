@@ -25,6 +25,7 @@ data State = State
     , variables    :: Map String (Bool, ASTTypeDenoter, Int)
     , labelCounter :: Int
     , slotCounter  :: Int
+    , code         :: String
     }
 data CodeGen a = CodeGen (State -> (a, State))
 
@@ -74,10 +75,22 @@ putVariable id typ = CodeGen (\st ->
         ((), st { variables = vars, slotCounter = sc + 1 })
     )
 
-genOp :: String -> [String] -> CodeGen String
-genOp op [] = return $ "    " ++ op ++ "\n"
-genOp op args =
-    return $ "    " ++ op ++ " " ++ (gen args) ++ "\n"
+-- append code string to internal state
+putCode :: String -> CodeGen ()
+putCode c = CodeGen (\st -> ((), st { code = (code st) ++ c }))
+
+-- get code string from state & clear code.
+getCode :: CodeGen String
+getCode = do
+    st <- getState
+    CodeGen (\st -> ((), st { code = "" }))
+    return $ code st
+
+-- put opcode into code
+putOp :: String -> [String] -> CodeGen ()
+putOp op [] = putCode $ "    " ++ op ++ "\n"
+putOp op args =
+    putCode $ "    " ++ op ++ " " ++ (gen args) ++ "\n"
     where gen (a:[]) = a
           gen (a:b:xs) = a ++ ", " ++ b
 
@@ -89,12 +102,15 @@ compileProgram (name, varDecls, procDecls, bodyStatement) =
             , variables     = Map.empty
             , labelCounter  = 0
             , slotCounter   = 0
+            , code          = ""
             }
         gen = do
             precompileProcedureDeclarationPart procDecls
             slot <- compileVariableDeclarationPart varDecls
-            procText <- compileProcedureDeclarationPart procDecls
-            bodyText <- compileCompoundStatement bodyStatement
+            compileProcedureDeclarationPart procDecls
+            procText <- getCode
+            compileCompoundStatement bodyStatement
+            bodyText <- getCode
             return (slot, procText, bodyText)
         (slot, procText, bodyText) = runState gen state
     in
@@ -148,8 +164,7 @@ precompileFormalParameterSection (isVar, (x : xs), typeDenoter) =
 -- compile a list of variable declarations
 -- takes a slot number, a symbol table and an AST fragment
 -- returns the advanced slot number and the updated symbol table
-compileVariableDeclarationPart ::
-    ASTVariableDeclarationPart -> CodeGen Int
+compileVariableDeclarationPart :: ASTVariableDeclarationPart -> CodeGen Int
 compileVariableDeclarationPart [] = do
     st <- getState
     clearSlotCounter
@@ -158,8 +173,7 @@ compileVariableDeclarationPart (x:xs) = do
     compileVariableDeclaration x
     compileVariableDeclarationPart xs
 
-compileVariableDeclaration ::
-    ASTVariableDeclaration -> CodeGen ()
+compileVariableDeclaration :: ASTVariableDeclaration -> CodeGen ()
 compileVariableDeclaration ([], typ) = return ()
 compileVariableDeclaration ((id:ids), typ) = do
     putVariable id typ
@@ -168,57 +182,50 @@ compileVariableDeclaration ((id:ids), typ) = do
 -- compile a list of procedures
 -- takes a label number, a symbol table and an AST fragment
 -- returns the advanced label number and the generated code
-compileProcedureDeclarationPart ::
-    ASTProcedureDeclarationPart -> CodeGen String
-compileProcedureDeclarationPart [] = return ""
+compileProcedureDeclarationPart :: ASTProcedureDeclarationPart -> CodeGen ()
+compileProcedureDeclarationPart [] = return ()
 compileProcedureDeclarationPart (x : xs) =
     error "compiling procedure declarations is not yet implemented"
 
 -- compile a list of statements
 -- takes a label number, a symbol table and an AST fragment
 -- returns the advanced label number and the generated code
-compileCompoundStatement ::
-    ASTCompoundStatement -> CodeGen String
-compileCompoundStatement [] = return ""
+compileCompoundStatement :: ASTCompoundStatement -> CodeGen ()
+compileCompoundStatement [] = return ()
 compileCompoundStatement (x : xs) = do
-    code0 <- compileStatement x
-    code1 <- compileCompoundStatement xs
-    return $ code0 ++ code1
+    compileStatement x
+    compileCompoundStatement xs
 
-compileStatement ::
-    ASTStatement -> CodeGen String
+compileStatement :: ASTStatement -> CodeGen ()
 compileStatement (WriteStringStatement s) = compileWriteStringStatement s
 compileStatement (AssignmentStatement s) = compileAssignmentStatement s
 compileStatement WritelnStatement = compileWritelnStatement
-compileStatement EmptyStatement = return ""
+compileStatement EmptyStatement = return ()
 compileStatement stat =
     error "compiling statement is not yet implemented"
 
 -- compile write statement
 
-compileWriteStringStatement ::
-    ASTWriteStringStatement -> CodeGen String
+compileWriteStringStatement :: ASTWriteStringStatement -> CodeGen ()
 compileWriteStringStatement str = do
-    c0 <- genOp "string_const" ["r0", "'" ++ (concatMap repl str) ++ "'"]
-    c1 <- genOp "call_builtin" ["print_string"]
-    return $ c0 ++ c1
+    putOp "string_const" ["r0", "'" ++ (concatMap repl str) ++ "'"]
+    putOp "call_builtin" ["print_string"]
     where
         repl '\'' = "''"
         repl c = [c]
 
-compileWritelnStatement :: CodeGen String
-compileWritelnStatement = genOp "call_builtin" ["print_newline"]
+compileWritelnStatement :: CodeGen ()
+compileWritelnStatement = putOp "call_builtin" ["print_newline"]
 
 
 -- compile assignment & expression
 
 compileAssignmentStatement ::
-    ASTAssignmentStatement -> CodeGen String
+    ASTAssignmentStatement -> CodeGen ()
 compileAssignmentStatement (var, expr) = do
-    (rvalue, code0) <- compileExpression expr
+    rvalue <- compileExpression expr
     (lvalue, ltype) <- compileVariableAccess var
-    code1 <- genOp "store" [lvalue, rvalue]
-    return $ code0 ++ code1
+    putOp "store" [lvalue, rvalue]
 
 -- return (lvalue, type) of the variable access.
 compileVariableAccess ::
@@ -233,16 +240,15 @@ compileVariableAccess (Identifier id) = do
         otherwise -> error $ "variable " ++ id ++
             " is an array, expecting an ordinary type."
 
--- return (register, code) of the expression
-compileExpression ::
-    ASTExpression -> CodeGen (String, String)
+-- return register where the result of expression
+compileExpression :: ASTExpression -> CodeGen String
 compileExpression (P.Const const) = do
     reg <- return $ "r0"  -- TODO
-    code <- case const of
-        UnsignedInteger x -> genOp "int_const" [reg, show x]
-        UnsignedReal x -> genOp "real_const" [reg, show x]
+    case const of
+        UnsignedInteger x -> putOp "int_const" [reg, show x]
+        UnsignedReal x -> putOp "real_const" [reg, show x]
         Boolean _ -> error "compiling boolean const is not yet implemented"
-    return (reg, code)
+    return reg
 
 compileExpression _ =
     error "compiling expression is not yet implemented"
