@@ -1184,7 +1184,7 @@ data TypeIdentifier =
     IntegerTypeIdentifier |
     RealTypeIdentifier |
     BooleanTypeIdentifier
-    deriving(Show)
+    deriving(Show, Eq)
 parseTypeIdentifier :: Parser ASTTypeIdentifier
 parseTypeIdentifier =
     trace

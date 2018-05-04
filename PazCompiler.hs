@@ -102,7 +102,10 @@ putOp op [] = putCode $ "    " ++ op ++ "\n"
 putOp op args =
     putCode $ "    " ++ op ++ " " ++ (gen args) ++ "\n"
     where gen (a:[]) = a
-          gen (a:b:xs) = a ++ ", " ++ b
+          gen (a:b:xs) = a ++ ", " ++ (gen $ b:xs)
+
+putComment :: String -> CodeGen ()
+putComment s = putCode $ "# " ++ s ++ "\n"
 
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
@@ -222,6 +225,7 @@ compileStatement stat =
 
 compileWriteStringStatement :: ASTWriteStringStatement -> CodeGen ()
 compileWriteStringStatement str = do
+    putComment "write string"
     reg <- nextRegister
     putOp "string_const" [reg, "'" ++ (concatMap repl str) ++ "'"]
     putOp "call_builtin" ["print_string"]
@@ -231,6 +235,7 @@ compileWriteStringStatement str = do
 
 compileWriteStatement :: ASTWriteStatement -> CodeGen ()
 compileWriteStatement expr = do
+    putComment "write"    
     (reg, typ) <- compileExpression expr
     func <- case typ of
         IntegerTypeIdentifier -> return "print_int"
@@ -241,13 +246,16 @@ compileWriteStatement expr = do
         else error "store/restore register is not yet implemented"
 
 compileWritelnStatement :: CodeGen ()
-compileWritelnStatement = putOp "call_builtin" ["print_newline"]
+compileWritelnStatement = do
+    putComment "write line"    
+    putOp "call_builtin" ["print_newline"]
 
 -- compile assignment & expression
 
 compileAssignmentStatement ::
     ASTAssignmentStatement -> CodeGen ()
 compileAssignmentStatement (var, expr) = do
+    putComment "assignment"
     (rvalue, rtype) <- compileExpression expr
     (lvalue, ltype) <- compileVariableAccess var
     case (rtype, ltype) of
@@ -306,6 +314,34 @@ compileExpression (SignOp sign expr) = do
         P.SignPlus  -> return ()
         P.SignMinus -> putOp func [reg, reg]
     return (reg, typ)
+-- not op
+compileExpression (NotOp expr) = do
+    (reg, typ) <- compileExpression expr
+    case typ of
+        BooleanTypeIdentifier -> putOp "not" [reg, reg]
+        otherwise -> error $ "`not` op in a non-boolean type"
+    return (reg, typ)
+-- relation op
+compileExpression (RelOp op expr0 expr1) = do
+    (r0, t0) <- compileExpression expr0
+    (r1, t1) <- compileExpression expr1
+    suffix <- case (t0, t1) of
+        (IntegerTypeIdentifier, IntegerTypeIdentifier) -> return "int"
+        (RealTypeIdentifier, RealTypeIdentifier)       -> return "real"        
+        (IntegerTypeIdentifier, RealTypeIdentifier) ->
+            putOp "int_to_real" [r0, r0] >> return "real"
+        (RealTypeIdentifier, IntegerTypeIdentifier) ->
+            putOp "int_to_real" [r1, r1] >> return "real"
+        otherwise -> error $ "relational op in non-boolean type"
+    func0 <- return $ case op of
+        Equal        -> "cmp_eq_"
+        NotEqual     -> "cmp_ne_"
+        LessThan     -> "cmp_lt_"
+        GreaterThan  -> "cmp_gl_"
+        LessEqual    -> "cmp_le_"
+        GreaterEqual -> "cmp_ge_"
+    putOp (func0 ++ suffix) [r0, r0, r1]
+    return (r0, BooleanTypeIdentifier)
 
 compileExpression _ =
     error "compiling expression is not yet implemented"
