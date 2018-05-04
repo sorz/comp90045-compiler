@@ -75,18 +75,26 @@ nextRegister = do
         then error "number of registers exceeds 1023"
         else return $ "r" ++ (show reg)
 
+clearRegisterCounter :: CodeGen ()
+clearRegisterCounter =
+    CodeGen (\st -> ((), st { regCounter = 0 }))
+
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
 putProcedure id params = CodeGen (\st ->
     let procs = Map.insert id params (procedures st) in
         ((), st { procedures = procs })
     )
 
-putVariable :: String -> ASTTypeDenoter -> CodeGen ()
-putVariable id typ = CodeGen (\st ->
+putVariable :: Bool -> String -> ASTTypeDenoter -> CodeGen ()
+putVariable v id typ = CodeGen (\st ->
     let sc = slotCounter st
-        vars = Map.insert id (False, typ, sc) (variables st) in
+        vars = Map.insert id (v, typ, sc) (variables st) in
         ((), st { variables = vars, slotCounter = sc + 1 })
     )
+
+clearVariables :: CodeGen ()
+clearVariables =
+    CodeGen (\st -> ((), st { variables = Map.empty }))
 
 -- append code string to internal state
 putCode :: String -> CodeGen ()
@@ -122,12 +130,16 @@ compileProgram (name, varDecls, procDecls, bodyStatement) =
             , code          = ""
             }
         gen = do
+            -- precompile
             precompileProcedureDeclarationPart procDecls
-            slot <- compileVariableDeclarationPart varDecls
+            -- producures
             compileProcedureDeclarationPart procDecls
             procText <- getCode
+            -- main producure
+            slot <- compileVariableDeclarationPart varDecls
             compileCompoundStatement bodyStatement
             bodyText <- getCode
+            -- return
             return (slot, procText, bodyText)
         (slot, procText, bodyText) = runState gen state
     in
@@ -184,7 +196,6 @@ precompileFormalParameterSection (isVar, (x : xs), typeDenoter) =
 compileVariableDeclarationPart :: ASTVariableDeclarationPart -> CodeGen Int
 compileVariableDeclarationPart [] = do
     st <- getState
-    clearSlotCounter
     return $ slotCounter st
 compileVariableDeclarationPart (x:xs) = do
     compileVariableDeclaration x
@@ -193,16 +204,57 @@ compileVariableDeclarationPart (x:xs) = do
 compileVariableDeclaration :: ASTVariableDeclaration -> CodeGen ()
 compileVariableDeclaration ([], typ) = return ()
 compileVariableDeclaration ((id:ids), typ) = do
-    putVariable id typ
+    putVariable False id typ
     compileVariableDeclaration (ids, typ)
 
 -- compile a list of procedures
 -- takes a label number, a symbol table and an AST fragment
 -- returns the advanced label number and the generated code
-compileProcedureDeclarationPart :: ASTProcedureDeclarationPart -> CodeGen ()
-compileProcedureDeclarationPart [] = return ()
-compileProcedureDeclarationPart (x : xs) =
-    error "compiling procedure declarations is not yet implemented"
+compileProcedureDeclarationPart :: ASTProcedureDeclarationPart -> CodeGen Int
+compileProcedureDeclarationPart [] = do
+    st <- getState
+    return $ slotCounter st
+compileProcedureDeclarationPart (x:xs) = do
+    compileProcedureDeclaration x
+    compileProcedureDeclarationPart xs
+
+compileProcedureDeclaration :: ASTProcedureDeclaration -> CodeGen ()
+compileProcedureDeclaration (id, params, vars, body) = do
+    putLabel id
+    putComment "prologue"
+    paramSlot <- compileFormalParameterList params
+    totalSlot <- compileVariableDeclarationPart vars
+    putOp "push_stack_frame" [show totalSlot]
+    storeProcedureParamters paramSlot paramSlot
+
+    compileCompoundStatement body
+
+    putComment "epilogue"
+    putOp "push_stack_frame" [show totalSlot]
+    putOp "return" []
+    clearVariables
+    clearSlotCounter
+
+compileFormalParameterList :: ASTFormalParameterList -> CodeGen Int
+compileFormalParameterList [] = do
+    st <- getState
+    return $ slotCounter st
+compileFormalParameterList (x:xs) = do
+    compileFormalParameterSection x
+    compileFormalParameterList xs
+
+compileFormalParameterSection :: ASTFormalParameterSection -> CodeGen ()
+compileFormalParameterSection (isVar, [], typ) = return ()
+compileFormalParameterSection (isVar, (id:ids), typ) = do
+    putVariable isVar id typ
+    compileFormalParameterSection (isVar, ids, typ)
+
+storeProcedureParamters :: Int -> Int -> CodeGen ()
+storeProcedureParamters 0 _ = clearRegisterCounter
+storeProcedureParamters left total = do
+    reg <- nextRegister
+    putOp "store" [show $ total - left, reg]
+    storeProcedureParamters (left - 1) total
 
 -- compile a list of statements
 -- takes a label number, a symbol table and an AST fragment
@@ -211,7 +263,7 @@ compileCompoundStatement :: ASTCompoundStatement -> CodeGen ()
 compileCompoundStatement [] = return ()
 compileCompoundStatement (x : xs) = do
     compileStatement x
-    CodeGen (\st -> ((), st { regCounter = 0 }))
+    clearRegisterCounter
     compileCompoundStatement xs
 
 compileStatement :: ASTStatement -> CodeGen ()
@@ -339,7 +391,10 @@ compileVariableAccess (IndexedVariable var) =
     error "compiling indexed variable access is not yet implemented"
 compileVariableAccess (Identifier id) = do
     st <- getState
-    (_, typ, slot) <- return $ (variables st) ! id
+    (var, typ, slot) <- return $ (variables st) ! id
+    case var of
+        False -> return ()
+        True  -> error "compiling var param is not yet implemented"
     case typ of
         OrdinaryTypeDenoter t -> return (show slot, t)
         otherwise -> error $ "variable " ++ id ++
