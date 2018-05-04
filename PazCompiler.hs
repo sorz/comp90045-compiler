@@ -275,6 +275,7 @@ compileVariableAccess (Identifier id) = do
 
 -- return register where the result of expression, with its type.
 compileExpression :: ASTExpression -> CodeGen (String, ASTTypeIdentifier)
+-- const access
 compileExpression (P.Const const) = do
     reg <- nextRegister
     typ <- return $ case const of
@@ -286,6 +287,24 @@ compileExpression (P.Const const) = do
         UnsignedReal    x -> putOp "real_const" [reg, show x]
         Boolean True      -> putOp "int_const"  [reg, "1"]
         Boolean False     -> putOp "int_const"  [reg, "0"]
+    return (reg, typ)
+-- var access
+compileExpression (Var var) = do
+    (slot, typ) <- compileVariableAccess var
+    reg <- nextRegister
+    putOp "load" [reg, slot]
+    return (reg, typ)
+-- sign op
+compileExpression (SignOp sign expr) = do
+    (reg, typ) <- compileExpression expr
+    func <- case typ of
+        IntegerTypeIdentifier -> return "neg_int"
+        RealTypeIdentifier    -> return "neg_real"
+        BooleanTypeIdentifier ->
+            error $ "sign op `" ++ (show sign) ++ "` in boolean type"
+    case sign of
+        P.SignPlus  -> return ()
+        P.SignMinus -> putOp func [reg, reg]
     return (reg, typ)
 
 compileExpression _ =
