@@ -205,13 +205,16 @@ compileCompoundStatement :: ASTCompoundStatement -> CodeGen ()
 compileCompoundStatement [] = return ()
 compileCompoundStatement (x : xs) = do
     compileStatement x
+    -- TODO: when insde procedure, keep param regs.
+    CodeGen (\st -> ((), st { regCounter = 0 }))
     compileCompoundStatement xs
 
 compileStatement :: ASTStatement -> CodeGen ()
 compileStatement (WriteStringStatement s) = compileWriteStringStatement s
-compileStatement (AssignmentStatement s) = compileAssignmentStatement s
-compileStatement WritelnStatement = compileWritelnStatement
-compileStatement EmptyStatement = return ()
+compileStatement (WriteStatement s)       = compileWriteStatement s
+compileStatement (AssignmentStatement s)  = compileAssignmentStatement s
+compileStatement WritelnStatement         = compileWritelnStatement
+compileStatement EmptyStatement           = return ()
 compileStatement stat =
     error "compiling statement is not yet implemented"
 
@@ -226,6 +229,17 @@ compileWriteStringStatement str = do
         repl '\'' = "''"
         repl c = [c]
 
+compileWriteStatement :: ASTWriteStatement -> CodeGen ()
+compileWriteStatement expr = do
+    (reg, typ) <- compileExpression expr
+    func <- case typ of
+        IntegerTypeIdentifier -> return "print_int"
+        RealTypeIdentifier    -> return "print_real"
+        BooleanTypeIdentifier -> return "print_bool"
+    if reg == "r0"
+        then putOp "call_builtin" [func]
+        else error "store/restore register is not yet implemented"
+
 compileWritelnStatement :: CodeGen ()
 compileWritelnStatement = putOp "call_builtin" ["print_newline"]
 
@@ -234,32 +248,45 @@ compileWritelnStatement = putOp "call_builtin" ["print_newline"]
 compileAssignmentStatement ::
     ASTAssignmentStatement -> CodeGen ()
 compileAssignmentStatement (var, expr) = do
-    rvalue <- compileExpression expr
+    (rvalue, rtype) <- compileExpression expr
     (lvalue, ltype) <- compileVariableAccess var
+    case (rtype, ltype) of
+        (IntegerTypeIdentifier, RealTypeIdentifier) ->
+            putOp "int_to_real" [rvalue, rvalue]
+        (RealTypeIdentifier, IntegerTypeIdentifier) ->
+            error $ "assignment real to integer variable: " ++ (show var)
+        (RealTypeIdentifier, BooleanTypeIdentifier) ->
+            error $ "assignment real to boolean variable: " ++ (show var)
+        otherwise -> return ()
     putOp "store" [lvalue, rvalue]
 
 -- return (lvalue, type) of the variable access.
 compileVariableAccess ::
-    ASTVariableAccess -> CodeGen (String, ASTTypeDenoter)
+    ASTVariableAccess -> CodeGen (String, ASTTypeIdentifier)
 compileVariableAccess (IndexedVariable var) =
     error "compiling indexed variable access is not yet implemented"
 compileVariableAccess (Identifier id) = do
     st <- getState
     (_, typ, slot) <- return $ (variables st) ! id
     case typ of
-        OrdinaryTypeDenoter _ -> return (show slot, typ)
+        OrdinaryTypeDenoter t -> return (show slot, t)
         otherwise -> error $ "variable " ++ id ++
             " is an array, expecting an ordinary type."
 
--- return register where the result of expression
-compileExpression :: ASTExpression -> CodeGen String
+-- return register where the result of expression, with its type.
+compileExpression :: ASTExpression -> CodeGen (String, ASTTypeIdentifier)
 compileExpression (P.Const const) = do
     reg <- nextRegister
+    typ <- return $ case const of
+        UnsignedInteger _ -> IntegerTypeIdentifier
+        UnsignedReal    _ -> RealTypeIdentifier
+        Boolean         _ -> BooleanTypeIdentifier
     case const of
-        UnsignedInteger x -> putOp "int_const" [reg, show x]
-        UnsignedReal x -> putOp "real_const" [reg, show x]
-        Boolean _ -> error "compiling boolean const is not yet implemented"
-    return reg
+        UnsignedInteger x -> putOp "int_const"  [reg, show x]
+        UnsignedReal    x -> putOp "real_const" [reg, show x]
+        Boolean True      -> putOp "int_const"  [reg, "1"]
+        Boolean False     -> putOp "int_const"  [reg, "0"]
+    return (reg, typ)
 
 compileExpression _ =
     error "compiling expression is not yet implemented"
