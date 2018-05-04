@@ -835,13 +835,14 @@ parseIfStatement =
             return (x0, x1, x2)
             )
 
-type ASTProcedureStatement = (ASTIdentifier, Maybe ASTActualParameterList)
+type ASTProcedureStatement = (ASTIdentifier, ASTActualParameterList)
 parseProcedureStatement :: Parser ASTProcedureStatement
 parseProcedureStatement = trace
     "parseProcedureStatement"
     (do
         x0 <- parseIdentifier
-        x1 <- optionMaybe $ try parseActualParameterList
+        x1 <- do
+            try parseActualParameterList <|> return []
         return (x0, x1)
         )
 

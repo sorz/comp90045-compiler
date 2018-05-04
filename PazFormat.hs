@@ -107,8 +107,8 @@ instance PrettyPrint P.ASTAssignmentStatement where
 
 -- procedure statement (call)
 instance PrettyPrint P.ASTProcedureStatement where
-    prettyPrint (id, Nothing) = prettyPrint id
-    prettyPrint (id, Just params) =
+    prettyPrint (id, []) = prettyPrint id
+    prettyPrint (id, params) =
         id +++ "(" +++ params +++ ")"
 
 instance PrettyPrint P.ASTActualParameterList where

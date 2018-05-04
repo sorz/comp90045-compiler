@@ -230,7 +230,7 @@ compileProcedureDeclaration (id, params, vars, body) = do
     compileCompoundStatement body
 
     putComment "epilogue"
-    putOp "push_stack_frame" [show totalSlot]
+    putOp "pop_stack_frame" [show totalSlot]
     putOp "return" []
     clearVariables
     clearSlotCounter
@@ -275,6 +275,7 @@ compileStatement (ReadStatement s)        = compileReadStatement s
 compileStatement (AssignmentStatement s)  = compileAssignmentStatement s
 compileStatement (IfStatement s)          = compileIfStatement s
 compileStatement (WhileStatement s)       = compileWhileStatement s
+compileStatement (ProcedureStatement s)   = compileProcedureStatement s
 compileStatement (CompoundStatement s)    = do
     putComment "begin"
     compileCompoundStatement s
@@ -364,6 +365,24 @@ compileBooleanExpression expr = do
         BooleanTypeIdentifier -> return reg
         otherwise -> error "condition is not a boolean expression"
 
+-- compile procedure call
+
+compileProcedureStatement :: ASTProcedureStatement -> CodeGen ()
+compileProcedureStatement (id, params) = do
+    compileActualParameterList 0 params
+    -- TODO: check id exist
+    putOp "call" [id]
+
+compileActualParameterList :: Int -> ASTActualParameterList -> CodeGen ()
+compileActualParameterList _ [] = return ()
+compileActualParameterList n (x:xs) = do
+    reg <- return $ "r" ++ (show n)
+    (reg', typ) <- compileExpression x
+    -- TODO: check param types
+    if reg == reg'
+        then return ()
+        else putOp "move" [reg, reg']
+    compileActualParameterList (n+1) xs
 
 -- compile assignment & expression
 
