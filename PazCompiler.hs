@@ -31,7 +31,8 @@ type Symbols =
 -- through the functions that implement the various parts of the compiler
 -- (the more advanced students might wish to use a state monad for this)
 type LabelCounter = Int
-data State = State Symbols LabelCounter
+type SlotCounter = Int
+data State = State Symbols LabelCounter SlotCounter
 data CodeGen a = CodeGen (State -> (a, State))
 
 instance Functor CodeGen where
@@ -59,24 +60,28 @@ runState (CodeGen gen) state = code where
 
 incLabelCounter :: CodeGen ()
 incLabelCounter =
-    CodeGen (\(State sym lc) -> ((), State sym (lc+1)))
+    CodeGen (\(State sym lc sc) -> ((), State sym (lc+1) sc))
+
+clearSlotCounter :: CodeGen ()
+clearSlotCounter =
+    CodeGen (\(State sym lc _) -> ((), State sym lc 0))
 
 nextLabel :: CodeGen String
 nextLabel = do
-    State symbols counter <- getState
+    State _ counter _ <- getState
     incLabelCounter
     return $ "label-" ++ (show counter)
 
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
-putProcedure id params = CodeGen (\(State (procs, vars) lc) ->
+putProcedure id params = CodeGen (\(State (procs, vars) lc sc) ->
     let procs' = Map.insert id params procs in
-        ((), State (procs', vars) lc)
+        ((), State (procs', vars) lc sc)
     )
 
-putVariable :: String -> (Bool, ASTTypeDenoter, Int) -> CodeGen ()
-putVariable id var = CodeGen (\(State (procs, vars) lc) ->
-    let vars' = Map.insert id var vars in
-        ((), State (procs, vars') lc)
+putVariable :: String -> ASTTypeDenoter -> CodeGen ()
+putVariable id typ = CodeGen (\(State (procs, vars) lc sc) ->
+    let vars' = Map.insert id (False, typ, sc) vars in
+        ((), State (procs, vars') lc (sc+1))
     )
 
 genOp :: String -> [String] -> CodeGen String
@@ -89,7 +94,7 @@ genOp op args =
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
     let
-        state = State (Map.empty, Map.empty) 0
+        state = State (Map.empty, Map.empty) 0 0
         gen = do
             precompileProcedureDeclarationPart procDecls
             slot <- compileVariableDeclarationPart varDecls
@@ -150,9 +155,20 @@ precompileFormalParameterSection (isVar, (x : xs), typeDenoter) =
 -- returns the advanced slot number and the updated symbol table
 compileVariableDeclarationPart ::
     ASTVariableDeclarationPart -> CodeGen Int
-compileVariableDeclarationPart [] = return 0
-compileVariableDeclarationPart (x : xs) =
-    error "compiling variable declarations is not yet implemented"
+compileVariableDeclarationPart [] = do
+    State _ _ sc <- getState
+    clearSlotCounter
+    return sc
+compileVariableDeclarationPart (x:xs) = do
+    compileVariableDeclaration x
+    compileVariableDeclarationPart xs
+
+compileVariableDeclaration ::
+    ASTVariableDeclaration -> CodeGen ()
+compileVariableDeclaration ([], typ) = return ()
+compileVariableDeclaration ((id:ids), typ) = do
+    putVariable id typ
+    compileVariableDeclaration (ids, typ)
 
 -- compile a list of procedures
 -- takes a label number, a symbol table and an AST fragment
