@@ -222,6 +222,7 @@ compileStatement (WriteStatement s)       = compileWriteStatement s
 compileStatement (ReadStatement s)        = compileReadStatement s
 compileStatement (AssignmentStatement s)  = compileAssignmentStatement s
 compileStatement (IfStatement s)          = compileIfStatement s
+compileStatement (WhileStatement s)       = compileWhileStatement s
 compileStatement (CompoundStatement s)    = do
     putComment "begin"
     compileCompoundStatement s
@@ -275,10 +276,7 @@ compileReadStatement var = do
 compileIfStatement :: ASTIfStatement -> CodeGen ()
 compileIfStatement (expr, stat0, stat1) = do
     putComment "if"
-    (reg, typ) <- compileExpression expr
-    case typ of
-        BooleanTypeIdentifier -> return ()
-        otherwise -> error "`if` condition is not a boolean expression"
+    reg <- compileBooleanExpression expr
     labelElse <- nextLabel
     putOp "branch_on_false" [reg, labelElse]
     compileStatement stat0
@@ -290,7 +288,30 @@ compileIfStatement (expr, stat0, stat1) = do
             putLabel labelElse
             compileStatement stat
             putLabel labelEnd
-    putComment "endif"
+    putComment "end if"
+
+-- compile while statement
+compileWhileStatement :: ASTWhileStatement -> CodeGen ()
+compileWhileStatement (expr, stat) = do
+    putComment "while"
+    labelStart <- nextLabel
+    labelEnd   <- nextLabel
+    putLabel labelStart
+    reg <- compileBooleanExpression expr
+    putOp "branch_on_false" [reg, labelEnd]
+    compileStatement stat
+    putOp "branch_uncond" [labelStart]
+    putLabel labelEnd
+
+-- helper function for if & while compiler:
+-- compile expr and panic if it's not a boolean expr.
+compileBooleanExpression :: ASTExpression -> CodeGen String
+compileBooleanExpression expr = do
+    (reg, typ) <- compileExpression expr
+    case typ of
+        BooleanTypeIdentifier -> return reg
+        otherwise -> error "condition is not a boolean expression"
+
 
 -- compile assignment & expression
 

@@ -16,7 +16,7 @@ begin
     write('And another positive integer: ');
     read(y);
 
-    writeln('');
+    writeln;
 
     if x < y then
     begin
@@ -32,7 +32,7 @@ begin
     write(' is ');
 
     quotient := x div y;
-    remainder := x - quotient * y;
+    remainder := x - quotient * y;    
 
     while remainder > 0 do 
     begin
@@ -42,6 +42,7 @@ begin
         remainder := x - quotient * y
     end;
 
-    writeln(y)
+    write(y);
+    writeln
 end.
 
