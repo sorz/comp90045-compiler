@@ -61,7 +61,10 @@ nextLabel :: CodeGen String
 nextLabel = do
     st <- getState
     CodeGen (\st -> ((), st { labelCounter = (labelCounter st) + 1 }))
-    return $ "label-" ++ (show $ labelCounter st)
+    return $ "label" ++ (show $ labelCounter st)
+
+putLabel :: String -> CodeGen ()
+putLabel l = putCode $ l ++ ":\n"
 
 nextRegister :: CodeGen String
 nextRegister = do
@@ -212,12 +215,17 @@ compileCompoundStatement (x : xs) = do
     compileCompoundStatement xs
 
 compileStatement :: ASTStatement -> CodeGen ()
+compileStatement EmptyStatement           = return ()
+compileStatement WritelnStatement         = compileWritelnStatement
 compileStatement (WriteStringStatement s) = compileWriteStringStatement s
 compileStatement (WriteStatement s)       = compileWriteStatement s
 compileStatement (ReadStatement s)        = compileReadStatement s
 compileStatement (AssignmentStatement s)  = compileAssignmentStatement s
-compileStatement WritelnStatement         = compileWritelnStatement
-compileStatement EmptyStatement           = return ()
+compileStatement (IfStatement s)          = compileIfStatement s
+compileStatement (CompoundStatement s)    = do
+    putComment "begin"
+    compileCompoundStatement s
+    putComment "end"
 compileStatement stat =
     error "compiling statement is not yet implemented"
 
@@ -226,8 +234,7 @@ compileStatement stat =
 compileWriteStringStatement :: ASTWriteStringStatement -> CodeGen ()
 compileWriteStringStatement str = do
     putComment "write string"
-    reg <- nextRegister
-    putOp "string_const" [reg, "'" ++ (concatMap repl str) ++ "'"]
+    putOp "string_const" ["r0", "'" ++ (concatMap repl str) ++ "'"]
     putOp "call_builtin" ["print_string"]
     where
         repl '\'' = "''"
@@ -248,7 +255,7 @@ compileWriteStatement expr = do
 
 compileWritelnStatement :: CodeGen ()
 compileWritelnStatement = do
-    putComment "write line"
+    putComment "writeln"
     putOp "call_builtin" ["print_newline"]
 
 -- compile read statement
@@ -262,6 +269,28 @@ compileReadStatement var = do
         BooleanTypeIdentifier -> "read_bool"
     putOp "call_builtin" [func]
     putOp "store" [slot, "r0"]
+
+
+-- compile if statement
+compileIfStatement :: ASTIfStatement -> CodeGen ()
+compileIfStatement (expr, stat0, stat1) = do
+    putComment "if"
+    (reg, typ) <- compileExpression expr
+    case typ of
+        BooleanTypeIdentifier -> return ()
+        otherwise -> error "`if` condition is not a boolean expression"
+    labelElse <- nextLabel
+    putOp "branch_on_false" [reg, labelElse]
+    compileStatement stat0
+    case stat1 of
+        Nothing -> putLabel labelElse
+        Just stat -> do
+            labelEnd <- nextLabel
+            putOp "branch_uncond" [labelEnd]
+            putLabel labelElse
+            compileStatement stat
+            putLabel labelEnd
+    putComment "endif"
 
 -- compile assignment & expression
 
