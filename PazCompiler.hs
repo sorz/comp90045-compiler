@@ -208,13 +208,13 @@ compileCompoundStatement :: ASTCompoundStatement -> CodeGen ()
 compileCompoundStatement [] = return ()
 compileCompoundStatement (x : xs) = do
     compileStatement x
-    -- TODO: when insde procedure, keep param regs.
     CodeGen (\st -> ((), st { regCounter = 0 }))
     compileCompoundStatement xs
 
 compileStatement :: ASTStatement -> CodeGen ()
 compileStatement (WriteStringStatement s) = compileWriteStringStatement s
 compileStatement (WriteStatement s)       = compileWriteStatement s
+compileStatement (ReadStatement s)        = compileReadStatement s
 compileStatement (AssignmentStatement s)  = compileAssignmentStatement s
 compileStatement WritelnStatement         = compileWritelnStatement
 compileStatement EmptyStatement           = return ()
@@ -241,14 +241,27 @@ compileWriteStatement expr = do
         IntegerTypeIdentifier -> return "print_int"
         RealTypeIdentifier    -> return "print_real"
         BooleanTypeIdentifier -> return "print_bool"
-    if reg == "r0"
-        then putOp "call_builtin" [func]
-        else error "store/restore register is not yet implemented"
+    if reg /= "r0"
+        then putOp "move" ["r0", reg]
+        else return ()
+    putOp "call_builtin" [func]
 
 compileWritelnStatement :: CodeGen ()
 compileWritelnStatement = do
     putComment "write line"
     putOp "call_builtin" ["print_newline"]
+
+-- compile read statement
+compileReadStatement :: ASTVariableAccess -> CodeGen ()
+compileReadStatement var = do
+    putComment "read"
+    (slot, typ) <- compileVariableAccess var
+    func <- return $ case typ of
+        IntegerTypeIdentifier -> "read_int"
+        RealTypeIdentifier    -> "read_real"
+        BooleanTypeIdentifier -> "read_bool"
+    putOp "call_builtin" [func]
+    putOp "store" [slot, "r0"]
 
 -- compile assignment & expression
 
