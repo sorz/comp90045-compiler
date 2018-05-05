@@ -10,6 +10,10 @@ import Data.Map (
 import qualified Data.Map as Map
 import PazLexer as L
 import PazParser as P
+import PazFormat (
+    prettyPrintString,
+    (+++)
+    )
 
 -- this is the entry point to the compiler from the Paz.hs driver module
 compileStartSymbol :: P.ASTStartSymbol -> String
@@ -103,7 +107,7 @@ putVariable isVar id typ = CodeGen (\st ->
     let sc = slotCounter st
         n = typeSizeOf typ
         vars = if Map.member id (variables st)
-            then error $ "duplicated paramaters/variables " ++ id
+            then error $ "duplicated paramaters or variables " ++ id
             else Map.insert id (isVar, typ, sc) (variables st) in
         ((), st { variables = vars, slotCounter = sc + n })
     )
@@ -112,7 +116,7 @@ getVariable :: ASTIdentifier -> CodeGen (Bool, ASTTypeDenoter, Int)
 getVariable id = do
     st <- getState
     case (variables st) !? id of
-        Nothing -> error $ "undefined variable/parameter " ++ id
+        Nothing -> error $ "undefined variable or parameter " ++ id
         Just v  -> return v
 
 clearVariables :: CodeGen ()
@@ -149,7 +153,8 @@ typeSizeOf (OrdinaryTypeDenoter _) = 1
 typeSizeOf (ArrayTypeDenoter ((lo, hi), _)) =
     if lo <= hi
         then hi - lo + 1
-        else error "expect m <= n in array[m..n]"
+        else error $ "expected m <= n in array[m..n], found "
+                     +++ hi ++ " and " +++ lo
 
 primitiveType :: ASTTypeDenoter -> ASTTypeIdentifier
 primitiveType (OrdinaryTypeDenoter t) = t
@@ -326,11 +331,8 @@ compileStatement (CompoundStatement s)    = do
 compileWriteStringStatement :: ASTWriteStringStatement -> CodeGen ()
 compileWriteStringStatement str = do
     putComment "write string"
-    putOp "string_const" ["r0", "'" ++ (concatMap repl str) ++ "'"]
+    putOp "string_const" ["r0", prettyPrintString str]
     putOp "call_builtin" ["print_string"]
-    where
-        repl '\'' = "''"
-        repl c = [c]
 
 compileWriteStatement :: ASTWriteStatement -> CodeGen ()
 compileWriteStatement expr = do
@@ -402,7 +404,7 @@ compileForStatement (i, initExpr, dir, endExpr, stat) = do
     iVar <- return $ Var i'      -- convert to ASTExpression
     typ <- variableType i'
     if typ /= IntegerTypeIdentifier
-        then error "expected integer in for statement"
+        then error $ "expected integer in for statement, found " +++ typ
         else return ()
     (relOp, addOp) <- return $ case dir of
         ForTo     -> (LessEqual, Plus)
@@ -421,7 +423,7 @@ compileBooleanExpression expr = do
     (reg, typ) <- compileExpression expr
     case typ of
         BooleanTypeIdentifier -> return reg
-        otherwise -> error "condition is not a boolean expression"
+        otherwise -> error $ "expected boolean expression, found " +++ typ
 
 -- compile procedure call
 
@@ -431,7 +433,8 @@ compileProcedureStatement (id, params) = do
     case (procedures st) !? id of
         Nothing -> error $ "call to undefined procedure " ++ id
         Just p -> if length p /= length params
-            then error $ "expected " ++ (show $ length p) ++ " parameters"
+            then error $ "expected " +++ length p ++
+                         " parameter(s), found " +++ length params
             else compileActualParameterList id 0 params
     putOp "call" [id]
 
@@ -447,8 +450,7 @@ compileActualParameterList id n (expr:params) = do
             Var var -> do
                 typ' <- variableType var
                 if typ' == typ then loadAddress reg var
-                else error $
-                    "expected " ++ (show typ) ++ ", found " ++ (show typ')
+                else error $ "expected " +++ typ +++ ", found " +++ typ'
             otherwise -> error "expected variable as parameter"
         else do
             resetRegisterCounter n
@@ -518,12 +520,12 @@ loadAddress reg (Identifier id) = do
 loadAddress reg (IndexedVariable (id, expr)) = do
     (index, typ) <- compileExpression expr
     if typ /= IntegerTypeIdentifier
-        then error "expected int in array index"
+        then error $ "expected int in array index, found " +++ typ
         else return ()
     (isVar, typ, slot) <- getVariable id
     case typ of
         (OrdinaryTypeDenoter _) ->
-            error "expected arrary variable, primitive found"
+            error $ "expected arrary variable, found primitive " ++ id
         (ArrayTypeDenoter ((0, _), _)) ->
             return ()
         (ArrayTypeDenoter ((lo, _), _)) -> do
@@ -563,7 +565,7 @@ compileExpression (SignOp sign expr) = do
         IntegerTypeIdentifier -> return "neg_int"
         RealTypeIdentifier    -> return "neg_real"
         BooleanTypeIdentifier ->
-            error $ "sign op `" ++ (show sign) ++ "` in boolean type"
+            error $ "expected integer or real, found boolean"
     case sign of
         P.SignPlus  -> return ()
         P.SignMinus -> putOp func [reg, reg]
@@ -573,7 +575,7 @@ compileExpression (NotOp expr) = do
     (reg, typ) <- compileExpression expr
     case typ of
         BooleanTypeIdentifier -> putOp "not" [reg, reg]
-        otherwise -> error $ "`not` op in a non-boolean type"
+        otherwise -> error $ "expected bool, found " +++ typ
     return (reg, typ)
 -- relation op
 compileExpression (RelOp op expr0 expr1) = do
@@ -588,7 +590,7 @@ compileExpression (RelOp op expr0 expr1) = do
     func1 <- return $ case typ of
         IntegerTypeIdentifier -> "int"
         RealTypeIdentifier    -> "real"
-        otherwise -> error $ "expect integer/real, but boolean found"
+        otherwise -> error $ "expect integer or real, found boolean"
     putOp (func0 ++ func1) [r0, r0, r1]
     return (r0, BooleanTypeIdentifier)
 -- adding op
@@ -647,6 +649,6 @@ needCastType RealTypeIdentifier    IntegerTypeIdentifier = CastRight
 needCastType RealTypeIdentifier    BooleanTypeIdentifier =
     error $ "expected real, found boolean"
 needCastType BooleanTypeIdentifier typ =
-    error $ "expected boolean, found " ++ (show typ)
+    error $ "expected boolean, found " +++ typ
 needCastType IntegerTypeIdentifier typ =
-    error $ "expected integer, found " ++ (show typ)
+    error $ "expected integer, found " +++ typ

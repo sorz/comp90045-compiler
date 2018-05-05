@@ -96,9 +96,12 @@ instance PrettyPrint P.ASTStatement where
     prettyPrint (WriteStatement s) = "write(" +++ s +++ ")"
     prettyPrint (WritelnStatement) = "writeln"
     prettyPrint (WriteStringStatement s) =
-        "write('" ++ (concatMap repl s) ++ "')"
-        where repl '\'' = "''"
-              repl c = [c]
+        "write(" ++ (prettyPrintString s) ++ ")"
+
+prettyPrintString :: String -> String
+prettyPrintString s = "'" ++ (concatMap repl s) ++ "'"
+    where repl '\'' = "''"
+          repl c = [c]
 
 -- assignment statement
 instance PrettyPrint P.ASTAssignmentStatement where 
