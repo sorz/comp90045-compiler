@@ -309,13 +309,12 @@ compileStatement (ReadStatement s)        = compileReadStatement s
 compileStatement (AssignmentStatement s)  = compileAssignmentStatement s
 compileStatement (IfStatement s)          = compileIfStatement s
 compileStatement (WhileStatement s)       = compileWhileStatement s
+compileStatement (ForStatement s)         = compileForStatement s
 compileStatement (ProcedureStatement s)   = compileProcedureStatement s
 compileStatement (CompoundStatement s)    = do
     putComment "begin"
     compileCompoundStatement s
     putComment "end"
-compileStatement stat =
-    error "compiling statement is not yet implemented"
 
 -- compile write statement
 
@@ -389,6 +388,27 @@ compileWhileStatement (expr, stat) = do
     compileStatement stat
     putOp "branch_uncond" [labelStart]
     putLabel labelEnd
+
+
+-- compile for statement
+compileForStatement :: ASTForStatement -> CodeGen ()
+compileForStatement (i, initExpr, dir, endExpr, stat) = do
+    putComment "for"
+    i' <- return $ Identifier i  -- convert to ASTVariableAccess
+    iVar <- return $ Var i'      -- convert to ASTExpression
+    typ <- variableType i'
+    if typ /= IntegerTypeIdentifier
+        then error "expected integer in for statement"
+        else return ()
+    (relOp, addOp) <- return $ case dir of
+        ForTo     -> (LessEqual, Plus)
+        ForDownTo -> (GreaterEqual, Minus)
+    expr  <- return $ RelOp relOp iVar endExpr
+    adder <- return $ AssignmentStatement
+        (i', AddOp addOp iVar (P.Const (UnsignedInteger 1)))
+    stat' <- return $ CompoundStatement $ [stat] ++ [adder]
+    compileAssignmentStatement (i', initExpr)
+    compileWhileStatement (expr, stat')
 
 -- helper function for if & while compiler:
 -- compile expr and panic if it's not a boolean expr.
