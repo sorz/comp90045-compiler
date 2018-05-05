@@ -4,7 +4,8 @@ import Control.Applicative
 import Control.Monad
 import Data.Map (
     Map,
-    (!)
+    (!),
+    (!?)
     )
 import qualified Data.Map as Map
 import PazLexer as L
@@ -84,7 +85,9 @@ resetRegisterCounter c =
 
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
 putProcedure id params = CodeGen (\st ->
-    let procs = Map.insert id params (procedures st) in
+    let procs = if Map.member id (procedures st)
+            then error $ "duplicated procedure " ++ id
+            else Map.insert id params (procedures st) in
         ((), st { procedures = procs })
     )
 
@@ -92,7 +95,6 @@ putProcedure id params = CodeGen (\st ->
 getProcedureParameter :: String -> Int -> CodeGen (Bool, ASTTypeDenoter)
 getProcedureParameter id n = do
     st <- getState
-    -- TODO: readable error message
     return $ (procedures st) ! id !! n
 
 
@@ -100,15 +102,18 @@ putVariable :: Bool -> String -> ASTTypeDenoter -> CodeGen ()
 putVariable isVar id typ = CodeGen (\st ->
     let sc = slotCounter st
         n = typeSizeOf typ
-        vars = Map.insert id (isVar, typ, sc) (variables st) in
+        vars = if Map.member id (variables st)
+            then error $ "duplicated paramaters/variables " ++ id
+            else Map.insert id (isVar, typ, sc) (variables st) in
         ((), st { variables = vars, slotCounter = sc + n })
     )
 
 getVariable :: ASTIdentifier -> CodeGen (Bool, ASTTypeDenoter, Int)
 getVariable id = do
     st <- getState
-    -- TODO: readable error message
-    return $ (variables st) ! id
+    case (variables st) !? id of
+        Nothing -> error $ "undefined variable/parameter " ++ id
+        Just v  -> return v
 
 clearVariables :: CodeGen ()
 clearVariables =
@@ -422,8 +427,12 @@ compileBooleanExpression expr = do
 
 compileProcedureStatement :: ASTProcedureStatement -> CodeGen ()
 compileProcedureStatement (id, params) = do
-    compileActualParameterList id 0 params
-    -- TODO: check id exist
+    st <- getState
+    case (procedures st) !? id of
+        Nothing -> error $ "call to undefined procedure " ++ id
+        Just p -> if length p /= length params
+            then error $ "expected " ++ (show $ length p) ++ " parameters"
+            else compileActualParameterList id 0 params
     putOp "call" [id]
 
 compileActualParameterList :: String -> Int ->
@@ -449,7 +458,6 @@ compileActualParameterList id n (expr:params) = do
                 CastRight -> putOp "int_to_real" [reg, reg']
                 NoNeed    -> if reg == reg' then return ()
                     else putOp "move" [reg, reg']
-    -- TODO: check param types
     compileActualParameterList id (n+1) params
 
 -- compile assignment & expression
@@ -460,15 +468,10 @@ compileAssignmentStatement (var, expr) = do
     putComment "assignment"
     ltype <- variableType var
     (rvalue, rtype) <- compileExpression expr
-    case (rtype, ltype) of
-        (IntegerTypeIdentifier, RealTypeIdentifier) ->
-            putOp "int_to_real" [rvalue, rvalue]
-        (RealTypeIdentifier, IntegerTypeIdentifier) ->
-            error $ "assignment real to integer variable: " ++ (show var)
-        (RealTypeIdentifier, BooleanTypeIdentifier) ->
-            error $ "assignment real to boolean variable: " ++ (show var)
-        -- TODO: int to bool?
-        otherwise -> return ()
+    case needCastType ltype rtype of
+        CastRight -> putOp "int_to_real" [rvalue, rvalue]
+        CastLeft  -> error $ "expected integer, found real"
+        NoNeed    -> return ()
     storeVariable var rvalue
 
 -- opeartions about variable access
