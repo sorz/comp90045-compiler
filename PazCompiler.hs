@@ -389,7 +389,6 @@ compileWhileStatement (expr, stat) = do
     putOp "branch_uncond" [labelStart]
     putLabel labelEnd
 
-
 -- compile for statement
 compileForStatement :: ASTForStatement -> CodeGen ()
 compileForStatement (i, initExpr, dir, endExpr, stat) = do
@@ -434,12 +433,9 @@ compileActualParameterList id n (expr:params) = do
     reg <- return $ register n
     (isVar, typ) <- getProcedureParameter id n
     if isVar
-        then do
-            (_, typ', slot) <- case expr of
-                Var (Identifier id) -> getVariable id
-                -- TODO: allow array?
-                otherwise -> error "expected variable as parameter"
-            putOp "load_address" [reg, show slot]
+        then case expr of
+            Var var -> loadAddress reg var
+            otherwise -> error "expected variable as parameter"
         else do
             resetRegisterCounter n
             (reg', typ') <- compileExpression expr
@@ -477,10 +473,6 @@ variableType (Identifier id) = do
 
 -- store register to a variable access
 storeVariable :: ASTVariableAccess -> String -> CodeGen ()
-storeVariable (IndexedVariable var) val = do
-    index <- nextRegister
-    loadActualAddress index var
-    putOp "store_indirect" [index, val]
 storeVariable (Identifier id) val = do
     (isVar, _, slot) <- getVariable id
     if not isVar
@@ -489,22 +481,31 @@ storeVariable (Identifier id) val = do
             addr <- nextRegister
             putOp "load" [addr, show slot]
             putOp "store_indirect" [addr, val]
+storeVariable var val = do
+    index <- nextRegister
+    loadAddress index var
+    putOp "store_indirect" [index, val]
 
 -- load variable to register
 loadVariable :: String -> ASTVariableAccess -> CodeGen ()
-loadVariable reg (IndexedVariable var) = do
-    loadActualAddress reg var
-    putOp "load_indirect" [reg, reg]
 loadVariable reg (Identifier id) = do
     (isVar, _, slot) <- getVariable id
     putOp "load" [reg, show slot]
     if isVar
         then putOp "load_indirect" [reg, reg]
         else return ()
+loadVariable reg var = do
+    loadAddress reg var
+    putOp "load_indirect" [reg, reg]
 
--- load actual address of an indexed variable to register
-loadActualAddress :: String -> ASTIndexedVariable -> CodeGen ()
-loadActualAddress reg (id, expr) = do
+-- load address of a variable to register
+loadAddress :: String -> ASTVariableAccess -> CodeGen ()
+loadAddress reg (Identifier id) = do
+    (isVar, _, slot) <- getVariable id
+    if isVar
+        then putOp "load" [reg, show slot]
+        else putOp "load_address" [reg, show slot]
+loadAddress reg (IndexedVariable (id, expr)) = do
     (index, typ) <- compileExpression expr
     if typ /= IntegerTypeIdentifier
         then error "expected int in array index"
