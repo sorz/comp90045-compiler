@@ -99,8 +99,9 @@ getProcedureParameter id n = do
 putVariable :: Bool -> String -> ASTTypeDenoter -> CodeGen ()
 putVariable isVar id typ = CodeGen (\st ->
     let sc = slotCounter st
+        n = typeSizeOf typ
         vars = Map.insert id (isVar, typ, sc) (variables st) in
-        ((), st { variables = vars, slotCounter = sc + 1 })
+        ((), st { variables = vars, slotCounter = sc + n })
     )
 
 getVariable :: ASTIdentifier -> CodeGen (Bool, ASTTypeDenoter, Int)
@@ -134,6 +135,22 @@ putOp op args =
 
 putComment :: String -> CodeGen ()
 putComment s = putCode $ "# " ++ s ++ "\n"
+
+-- helper functions for AST
+
+-- return the number of slot the variable take
+typeSizeOf :: ASTTypeDenoter -> Int
+typeSizeOf (OrdinaryTypeDenoter _) = 1
+typeSizeOf (ArrayTypeDenoter ((lo, hi), _)) =
+    if lo <= hi
+        then hi - lo + 1
+        else error "expect m <= n in array[m..n]"
+
+primitiveType :: ASTTypeDenoter -> ASTTypeIdentifier
+primitiveType (OrdinaryTypeDenoter t) = t
+primitiveType (ArrayTypeDenoter (_, t)) = t
+
+-- main function
 
 compileProgram :: ASTProgram -> String
 compileProgram (name, varDecls, procDecls, bodyStatement) =
@@ -339,6 +356,7 @@ compileReadStatement var = do
         RealTypeIdentifier    -> "read_real"
         BooleanTypeIdentifier -> "read_bool"
     putOp "call_builtin" [func]
+    resetRegisterCounter 1
     storeVariable var "r0"
 
 -- compile if statement
@@ -431,20 +449,18 @@ compileAssignmentStatement (var, expr) = do
     storeVariable var rvalue
 
 -- opeartions about variable access
-
 variableType :: ASTVariableAccess -> CodeGen ASTTypeIdentifier
 variableType (IndexedVariable (id, _)) = variableType (Identifier id)
 variableType (Identifier id) = do
     (_, typ, _) <- getVariable id
-    return $ case typ of
-        OrdinaryTypeDenoter t -> t
-        ArrayTypeDenoter (_, t) -> t
-
+    return $ primitiveType typ
 
 -- store register to a variable access
 storeVariable :: ASTVariableAccess -> String -> CodeGen ()
-storeVariable (IndexedVariable var) reg =
-    error "compiling indexed variable access is not yet implemented"    
+storeVariable (IndexedVariable var) val = do
+    index <- nextRegister
+    loadActualAddress index var
+    putOp "store_indirect" [index, val]
 storeVariable (Identifier id) val = do
     (isVar, _, slot) <- getVariable id
     if not isVar
@@ -454,15 +470,39 @@ storeVariable (Identifier id) val = do
             putOp "load" [addr, show slot]
             putOp "store_indirect" [addr, val]
 
+-- load variable to register
 loadVariable :: String -> ASTVariableAccess -> CodeGen ()
-loadVariable reg (IndexedVariable var) = 
-    error "compiling indexed variable access is not yet implemented"    
+loadVariable reg (IndexedVariable var) = do
+    loadActualAddress reg var
+    putOp "load_indirect" [reg, reg]
 loadVariable reg (Identifier id) = do
     (isVar, _, slot) <- getVariable id
     putOp "load" [reg, show slot]
     if isVar
         then putOp "load_indirect" [reg, reg]
         else return ()
+
+-- load actual address of an indexed variable to register
+loadActualAddress :: String -> ASTIndexedVariable -> CodeGen ()
+loadActualAddress reg (id, expr) = do
+    (index, typ) <- compileExpression expr
+    if typ /= IntegerTypeIdentifier
+        then error "expected int in array index"
+        else return ()
+    (isVar, typ, slot) <- getVariable id
+    case typ of
+        (OrdinaryTypeDenoter _) ->
+            error "expected arrary variable, primitive found"
+        (ArrayTypeDenoter ((0, _), _)) ->
+            return ()
+        (ArrayTypeDenoter ((lo, _), _)) -> do
+            lo' <- nextRegister
+            putOp "int_const" [lo', show lo]
+            putOp "sub_int" [index, index, lo']
+    if isVar
+        then putOp "load" [reg, show slot]
+        else putOp "load_address" [reg, show slot]
+    putOp "add_offset" [reg, reg, index]
 
 -- return register where the result of expression, with its type.
 compileExpression :: ASTExpression -> CodeGen (String, ASTTypeIdentifier)

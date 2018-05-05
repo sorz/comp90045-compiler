@@ -286,10 +286,6 @@ instance PrettyPrint P.ASTSubrangeType where
     prettyPrint (const1, const2) =
         const1 +++ ".." +++ const2
 
-instance PrettyPrint P.ASTConstant where
-    prettyPrint (sign, n) =
-        sign +++ n
-
 ----------------
 -- lexer section
 -----------------

@@ -1242,7 +1242,7 @@ parseSubrangeType =
                 return (x0, x1)
             )
 
-type ASTConstant = ((Maybe ASTSign), ASTUnsignedInteger)
+type ASTConstant = Int
 parseConstant :: Parser ASTConstant
 parseConstant =
     trace
@@ -1257,7 +1257,11 @@ parseConstant =
                         )
                 x1 <-
                     parseUnsignedInteger
-                return (x0, x1)
+                return (
+                    case x0 of
+                        Just SignMinus -> -x1
+                        otherwise -> x1
+                    )
             )
 
 type ASTSign = Sign
