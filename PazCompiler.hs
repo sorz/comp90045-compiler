@@ -432,16 +432,23 @@ compileActualParameterList _ _ [] = return ()
 compileActualParameterList id n (expr:params) = do
     reg <- return $ register n
     (isVar, typ) <- getProcedureParameter id n
+    typ <- return $ primitiveType typ
     if isVar
         then case expr of
-            Var var -> loadAddress reg var
+            Var var -> do
+                typ' <- variableType var
+                if typ' == typ then loadAddress reg var
+                else error $
+                    "expected " ++ (show typ) ++ ", found " ++ (show typ')
             otherwise -> error "expected variable as parameter"
         else do
             resetRegisterCounter n
             (reg', typ') <- compileExpression expr
-            if reg == reg'
-                then return ()
-                else putOp "move" [reg, reg']
+            case needCastType typ typ' of
+                CastLeft  -> error "expected integer, found real"
+                CastRight -> putOp "int_to_real" [reg, reg']
+                NoNeed    -> if reg == reg' then return ()
+                    else putOp "move" [reg, reg']
     -- TODO: check param types
     compileActualParameterList id (n+1) params
 
@@ -523,7 +530,7 @@ loadAddress reg (IndexedVariable (id, expr)) = do
     if isVar
         then putOp "load" [reg, show slot]
         else putOp "load_address" [reg, show slot]
-    putOp "add_offset" [reg, reg, index]
+    putOp "sub_offset" [reg, reg, index]
 
 -- return register where the result of expression, with its type.
 compileExpression :: ASTExpression -> CodeGen (String, ASTTypeIdentifier)
@@ -621,16 +628,22 @@ unifyTypesInBinaryNumberExpr :: ASTExpression -> ASTExpression ->
 unifyTypesInBinaryNumberExpr expr0 expr1 = do
     (r0, t0) <- compileExpression expr0
     (r1, t1) <- compileExpression expr1
-    typ <- case (t0, t1) of
-        (IntegerTypeIdentifier, IntegerTypeIdentifier) ->
-            return IntegerTypeIdentifier
-        (RealTypeIdentifier, RealTypeIdentifier) ->
-            return RealTypeIdentifier
-        (BooleanTypeIdentifier, BooleanTypeIdentifier) ->
-            return BooleanTypeIdentifier
-        (IntegerTypeIdentifier, RealTypeIdentifier) ->
-            putOp "int_to_real" [r0, r0] >> return RealTypeIdentifier
-        (RealTypeIdentifier, IntegerTypeIdentifier) ->
-            putOp "int_to_real" [r1, r1] >> return RealTypeIdentifier
-        otherwise -> error $ "mixed number & boolean in expression"
+    typ <- case needCastType t0 t1 of
+        CastLeft  -> putOp "int_to_real" [r0, r0] >> return RealTypeIdentifier
+        CastRight -> putOp "int_to_real" [r1, r1] >> return RealTypeIdentifier
+        NoNeed    -> return t0
     return (r0, r1, typ)
+
+data Cast = NoNeed | CastLeft | CastRight
+needCastType :: ASTTypeIdentifier -> ASTTypeIdentifier -> Cast
+needCastType IntegerTypeIdentifier IntegerTypeIdentifier = NoNeed
+needCastType RealTypeIdentifier    RealTypeIdentifier    = NoNeed
+needCastType BooleanTypeIdentifier BooleanTypeIdentifier = NoNeed
+needCastType IntegerTypeIdentifier RealTypeIdentifier    = CastLeft
+needCastType RealTypeIdentifier    IntegerTypeIdentifier = CastRight
+needCastType RealTypeIdentifier    BooleanTypeIdentifier =
+    error $ "expected real, found boolean"
+needCastType BooleanTypeIdentifier typ =
+    error $ "expected boolean, found " ++ (show typ)
+needCastType IntegerTypeIdentifier typ =
+    error $ "expected integer, found " ++ (show typ)
