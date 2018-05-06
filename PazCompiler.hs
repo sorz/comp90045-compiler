@@ -5,7 +5,6 @@ import Control.Monad
 import Data.Map (
     Map,
     (!),
-    (!?)
     )
 import qualified Data.Map as Map
 import PazLexer as L
@@ -71,9 +70,6 @@ nextLabel = do
 putLabel :: String -> CodeGen ()
 putLabel l = putCode $ l ++ ":\n"
 
-register :: Int -> String
-register n = "r" ++ (show n)
-
 nextRegister :: CodeGen String
 nextRegister = do
     st <- getState
@@ -81,7 +77,7 @@ nextRegister = do
     CodeGen (\st -> ((), st { regCounter = reg + 1 }))
     if reg > 1023
         then error "number of registers exceeds 1023"
-        else return $ register reg
+        else return $ "r" ++ (show reg)
 
 resetRegisterCounter :: Int -> CodeGen ()
 resetRegisterCounter c =
@@ -115,7 +111,7 @@ putVariable isVar id typ = CodeGen (\st ->
 getVariable :: ASTIdentifier -> CodeGen (Bool, ASTTypeDenoter, Int)
 getVariable id = do
     st <- getState
-    case (variables st) !? id of
+    case Map.lookup id (variables st) of
         Nothing -> error $ "undefined variable or parameter " ++ id
         Just v  -> return v
 
@@ -429,8 +425,9 @@ compileBooleanExpression expr = do
 
 compileProcedureStatement :: ASTProcedureStatement -> CodeGen ()
 compileProcedureStatement (id, params) = do
+    putComment $ "call " ++ id
     st <- getState
-    case (procedures st) !? id of
+    case Map.lookup id (procedures st) of
         Nothing -> error $ "call to undefined procedure " ++ id
         Just p -> if length p /= length params
             then error $ "expected " +++ length p ++
@@ -442,7 +439,8 @@ compileActualParameterList :: String -> Int ->
     ASTActualParameterList -> CodeGen ()
 compileActualParameterList _ _ [] = return ()
 compileActualParameterList id n (expr:params) = do
-    reg <- return $ register n
+    resetRegisterCounter n
+    reg <- nextRegister
     (isVar, typ) <- getProcedureParameter id n
     typ <- return $ primitiveType typ
     if isVar
@@ -453,7 +451,6 @@ compileActualParameterList id n (expr:params) = do
                 else error $ "expected " +++ typ +++ ", found " +++ typ'
             otherwise -> error "expected variable as parameter"
         else do
-            resetRegisterCounter n
             (reg', typ') <- compileExpression expr
             case needCastType typ typ' of
                 CastLeft  -> error "expected integer, found real"
