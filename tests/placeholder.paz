@@ -2,7 +2,8 @@ program placeholder;
 
 var
     color: integer;
-    n, m: integer;
+    n, m, i: integer;
+    f: real;
     ns: array [2..5] of integer;
     fs: array [1..4] of real;
 
@@ -19,6 +20,51 @@ begin
     x := x - (x div m) * m;
 end;
 
+{ silly real to integer converter }
+procedure floor(i: real; var n: integer);
+begin
+    n := 0;
+    while i > 0 do
+    begin
+        n := n + 1;
+        i := i - 1;
+    end
+end;
+
+{ out := x ^ n }
+procedure pow(x: real; n: integer; var out: real);
+begin
+    out := 1;
+    for n := n downto 1 do
+        out := out * x;
+end;
+
+{ out := sin(x), x >= 0 }
+procedure sin(x: real; var out: real);
+var px: real;
+    n, sign: integer;
+begin
+    { sin(x + pi) = -sin(x) }
+    floor(x / 3.141592653, n);
+    x := x - n * 3.141592653;
+    mod(n, 2);
+    if n = 0 then
+        sign := 1
+    else
+        sign := -1;
+
+    { Taylor series expansion for sin(x) }
+    out := x;
+    pow(x, 3, px);
+    out := out - 1 / 6 * px;
+    pow(x, 5, px);
+    out := out + 1 / 120 * px;
+    pow(x, 7, px);
+    out := out - 1 / 5040 * px;
+
+    out := out * sign;
+end;
+
 procedure writeEsc;
 begin
     write('[');
@@ -30,51 +76,57 @@ begin
     write('0m');
 end;
 
-procedure nextColor(var c: integer);
-var r, g, b, rgb: integer;
+procedure nextColor(var c: integer; f: real);
+var r, g, b: real;
+    rn, gn, bn: integer;
 begin
     { clear last color if neeed }
     if c > 0 then endColor;
 
-    { caculate the next 6 x 6 x 6 RGB color
-      * ugly color pattern *
-      `lolcat` use sine function, but we haven't it 😩 }
+    { caculate the next RGB color
+      credit: github busyloop/lolcat }
     c := c + 1;
-    r := c div 2;
-    g := (r + 3) div 2;
-    b := (g + 5) div 2;
-    mod(r, 6);
-    mod(g, 6);
-    mod(b, 6);
-    rgb := 16 + r * 36 + g * 6 + b;
-
+    sin(f * c + 0, r);
+    sin(f * c + 2.0944, g);
+    sin(f * c + 4.1888, b);
+    floor(r * 192, rn);
+    floor(g * 192, gn);
+    floor(b * 192, bn);
+    
     { write color esc }
     writeEsc;
-    write('38;5;');
-    if rgb < 10 then write(0);
-    if rgb < 100 then write(0);
-    write(rgb);
+    write('38;2;');
+    write(rn + 63);
+    write(';');
+    write(gn + 63);
+    write(';');
+    write(bn + 63);
     write('m');
 end;
 
 begin
     { copy as output of `lolcat` }
-    write('    [38;5;119m-[0m[38;5;118m=[0m[38;5;154m [0m[38;5;154mp');
+    write('       [38;5;119m-[0m[38;5;118m=[0m[38;5;154m [0m[38;5;154mp');
     write('[0m[38;5;148ml[0m[38;5;184ma[0m[38;5;184mc[0m[38;5;214me');
     write('[0m[38;5;214mh[0m[38;5;208mo[0m[38;5;208ml[0m[38;5;203md');
     write('[0m[38;5;203me[0m[38;5;198mr[0m[38;5;198m [0m[38;5;199mt');
     write('[0m[38;5;199me[0m[38;5;164ma[0m[38;5;164mm[0m[38;5;128m ');
     write('[0m[38;5;129m=[0m[38;5;93m-[0m');
     write(' 😜');
-    writeln;
+    writeln; writeln;
 
     color := 0;
-    for m := 0 to 5 do
+    for m := 1 to 5 do
     begin
-        for n := 0 to 20 do
-        begin
-            nextColor(color);
-            write(n);
+        for i := 0 to 3 do
+            begin
+            for n := 0 to 9 do
+            begin
+                nextColor(color, 0.05 * m);
+                if m < 3
+                    then write(n)
+                    else write(9 - n);
+            end;
         end;
         writeln;
     end;
@@ -89,7 +141,7 @@ begin
     
     for n := 4 downto 1 do
     begin
-        nextColor(color);
+        nextColor(color, 1.5);
         write(fs[n]);
         writeln
     end;
