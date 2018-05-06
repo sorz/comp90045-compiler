@@ -1,0 +1,97 @@
+program placeholder;
+
+var
+    color: integer;
+    n, m: integer;
+    ns: array [2..5] of integer;
+    fs: array [1..4] of real;
+
+procedure set(var n: integer; var m: real);
+var f: real;
+begin
+    f := n;
+    m := f;
+end;
+
+{ x := x mod m }
+procedure mod(var x: integer; m: integer);
+begin
+    x := x - (x div m) * m;
+end;
+
+procedure writeEsc;
+begin
+    write('[');
+end;
+
+procedure endColor;
+begin
+    writeEsc;
+    write('0m');
+end;
+
+procedure nextColor(var c: integer);
+var r, g, b, rgb: integer;
+begin
+    { clear last color if neeed }
+    if c > 0 then endColor;
+
+    { caculate the next 6 x 6 x 6 RGB color
+      * ugly color pattern *
+      `lolcat` use sine function, but we haven't it 😩 }
+    c := c + 1;
+    r := c div 2;
+    g := (r + 3) div 2;
+    b := (g + 5) div 2;
+    mod(r, 6);
+    mod(g, 6);
+    mod(b, 6);
+    rgb := 16 + r * 36 + g * 6 + b;
+
+    { write color esc }
+    writeEsc;
+    write('38;5;');
+    if rgb < 10 then write(0);
+    if rgb < 100 then write(0);
+    write(rgb);
+    write('m');
+end;
+
+begin
+    { copy as output of `lolcat` }
+    write('    [38;5;119m-[0m[38;5;118m=[0m[38;5;154m [0m[38;5;154mp');
+    write('[0m[38;5;148ml[0m[38;5;184ma[0m[38;5;184mc[0m[38;5;214me');
+    write('[0m[38;5;214mh[0m[38;5;208mo[0m[38;5;208ml[0m[38;5;203md');
+    write('[0m[38;5;203me[0m[38;5;198mr[0m[38;5;198m [0m[38;5;199mt');
+    write('[0m[38;5;199me[0m[38;5;164ma[0m[38;5;164mm[0m[38;5;128m ');
+    write('[0m[38;5;129m=[0m[38;5;93m-[0m');
+    write(' 😜');
+    writeln;
+
+    color := 0;
+    for m := 0 to 5 do
+    begin
+        for n := 0 to 20 do
+        begin
+            nextColor(color);
+            write(n);
+        end;
+        writeln;
+    end;
+    
+    { boring test code below }
+
+    for n := 2 to 5 do
+    begin
+        ns[n] := n;
+        set(ns[n], fs[ns[n] - 1]);
+    end;
+    
+    for n := 4 downto 1 do
+    begin
+        nextColor(color);
+        write(fs[n]);
+        writeln
+    end;
+    endColor;
+end.
