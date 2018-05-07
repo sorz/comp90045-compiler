@@ -451,6 +451,8 @@ compileActualParameterList id n (expr:params) = do
                 else error $ "expected " +++ typ +++ ", found " +++ typ'
             otherwise -> error "expected variable as parameter"
         else do
+            -- reset counter to prefer rN register
+            resetRegisterCounter n
             (reg', typ') <- compileExpression expr
             case needCastType typ typ' of
                 CastLeft  -> error "expected integer, found real"
