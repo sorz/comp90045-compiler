@@ -1,6 +1,6 @@
 GHC=ghc
 
-Paz: Paz.hs PazLexer.hs PazParser.hs PazFormat.hs
+Paz: Paz.hs PazLexer.hs PazParser.hs PazFormat.hs PazCompiler.hs
 	$(GHC) Paz.hs
 
 .PHONY: clean
