@@ -3,6 +3,8 @@ taz_emulator/ptaz.c
 taz_emulator/ptaz.h
 taz_emulator/ltaz.c
 *.taz
+/Paz
+tests/contrib/
 
 dist
 dist-*
