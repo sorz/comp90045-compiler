@@ -1,12 +1,15 @@
 {-# LANGUAGE PackageImports #-}
 -- The entry point (main) of Paz compiler program.
+-- Our solution of the programming project in COMP90045,
+-- the University of Melbourne.
 --
 -- Require following modules:
---  * PazLexer:  lexer of Paz
---  * PazParser: synatx parser of Paz
---  * PazFormat: pretty printing
+--  * PazLexer:    lexer of Paz
+--  * PazParser:   synatx parser of Paz
+--  * PazFormat:   pretty printing
+--  * PazCompiler: Paz to Taz compiler
 --
--- Written by team Placeholder.
+-- Written by team Placeholder, May 2018.
 import Text.Parsec (parse, ParseError)
 import PazLexer
 import PazParser

@@ -1,3 +1,7 @@
+-- Module PazParser contains the parser of Paz language.
+--
+-- This file was provided by the course COMP90045, and
+-- modified by team Placeholder in May 2018.
 module PazParser where
 
 import Text.Parsec (

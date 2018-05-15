@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-
 -- Module PazFormat contains the implementation of pretty printing.
 --
 -- The module was organized as following:

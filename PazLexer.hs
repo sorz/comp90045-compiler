@@ -1,3 +1,7 @@
+-- Module PazLexer contains the lexer of Paz language.
+--
+-- This file was provided by the course COMP90045, and
+-- modified by team Placeholder in May 2018.
 module PazLexer where
 
 --import Debug.Trace (trace)

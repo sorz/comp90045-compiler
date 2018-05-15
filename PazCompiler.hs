@@ -1,3 +1,7 @@
+-- Module PazCompiler contains the implementation of compiler,
+-- which compile Paz source code to Taz instructions.
+--
+-- Written by team Placeholder, May 2018.
 module PazCompiler where
 
 import Control.Applicative
