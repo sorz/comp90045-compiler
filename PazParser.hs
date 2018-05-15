@@ -764,7 +764,7 @@ parseEmptyStatement :: Parser ASTEmptyStatement
 parseEmptyStatement =
     trace
         "parseEmptyStatement"
-        lookAhead (parseTokenEnd <|> parseTokenDot)
+        lookAhead (parseTokenEnd <|> parseTokenDot <|> parseTokenSemicolon)
 
 type ASTAssignmentStatement = (ASTVariableAccess, ASTExpression)
 parseAssignmentStatement :: Parser ASTAssignmentStatement
