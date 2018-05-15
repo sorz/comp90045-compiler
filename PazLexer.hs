@@ -647,9 +647,12 @@ parseUnsignedReal =
                                         "." ++
                                         x1 ++
                                         case x2 of
-                                            Just (Just SignMinus, x) -> "e-" ++ x
-                                            Just (_, x) -> "e" ++ x
-                                            Nothing -> ""
+                                            Just (Just SignMinus, x)
+                                                -> "e-" ++ x
+                                            Just (_, x)
+                                                -> "e" ++ x
+                                            Nothing
+                                                -> ""
                                     )
                                 )
                         ),

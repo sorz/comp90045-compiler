@@ -663,7 +663,9 @@ parseStartSymbol =
                 return x0
             )
 
-type ASTProgram = (ASTIdentifier, ASTVariableDeclarationPart, ASTProcedureDeclarationPart, ASTCompoundStatement)
+type ASTProgram =
+    (ASTIdentifier, ASTVariableDeclarationPart,
+    ASTProcedureDeclarationPart, ASTCompoundStatement)
 parseProgram :: Parser ASTProgram
 parseProgram =
     trace
@@ -862,7 +864,8 @@ parseActualParameterList = trace
         )
 
 
-type ASTForStatement = (ASTIdentifier, ASTExpression, ForDirection, ASTExpression, ASTStatement)
+type ASTForStatement =
+    (ASTIdentifier, ASTExpression, ForDirection, ASTExpression, ASTStatement)
 data ForDirection =
     ForTo | ForDownTo
     deriving Show
@@ -1059,7 +1062,9 @@ parseUnsignedConstant = trace
 
 -- your code ends here
 
-type ASTProcedureDeclaration = (ASTIdentifier, ASTFormalParameterList, ASTVariableDeclarationPart, ASTCompoundStatement)
+type ASTProcedureDeclaration =
+    (ASTIdentifier, ASTFormalParameterList,
+    ASTVariableDeclarationPart, ASTCompoundStatement)
 parseProcedureDeclaration :: Parser ASTProcedureDeclaration
 parseProcedureDeclaration =
     trace
