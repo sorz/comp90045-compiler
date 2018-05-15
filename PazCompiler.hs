@@ -1,6 +1,16 @@
 -- Module PazCompiler contains the implementation of compiler,
 -- which compile Paz source code to Taz instructions.
 --
+-- The module was organized as following:
+--   * Definition of the state monad (including symbol tables)
+--   * Helpers for interact with the state
+--   * The main function of compiler
+--   * Pre-compilations
+--   * Procedures compilation
+--   * Procedure call compilation
+--   * Variable access compilation
+--   * Expression compilation
+--
 -- Written by team Placeholder, May 2018.
 module PazCompiler where
 
@@ -23,24 +33,29 @@ compileStartSymbol :: P.ASTStartSymbol -> String
 compileStartSymbol =
     compileProgram
 
--- the following is a suggestion for how your compiler can be structured,
--- there is no requirement to follow this template but it shows how the
--- important information (such as current label number) can be threaded
--- through the functions that implement the various parts of the compiler
--- (the more advanced students might wish to use a state monad for this)
+-- following part build a state monad and some helper function that
+-- interact with the state.
+
+-- state monad is used to maintain states crossing the entire compiling
+-- process
 data State = State
+    -- tables of procedures and all local variables
+    -- (including parameters if any in current procedure)
     { procedures   :: Map String [(Bool, ASTTypeDenoter)]
     , variables    :: Map String (Bool, ASTTypeDenoter, Int)
+    -- counters for label, slot and register
     , labelCounter :: Int
     , slotCounter  :: Int
     , regCounter   :: Int
+    -- generated code is also put on state,
+    -- so that we don't have to return String everywhere
     , code         :: String
     }
 data CodeGen a = CodeGen (State -> (a, State))
 
+-- Functor and Applicative are required by state monad
 instance Functor CodeGen where
     fmap = Control.Monad.liftM
-
 instance Applicative CodeGen where
     pure = return
     (<*>) = Control.Monad.ap
@@ -61,19 +76,23 @@ runState :: CodeGen a -> State -> a
 runState (CodeGen gen) state = code where
     (code, _) = gen state
 
+-- reset slotCounter to zero
 clearSlotCounter :: CodeGen ()
 clearSlotCounter =
     CodeGen (\st -> ((), st { slotCounter = 0 }))
 
+-- return a unused label and increase the counter
 nextLabel :: CodeGen String
 nextLabel = do
     st <- getState
     CodeGen (\st -> ((), st { labelCounter = (labelCounter st) + 1 }))
     return $ "label" ++ (show $ labelCounter st)
 
+-- put a label into code, i.e. write out "label-n:\n"
 putLabel :: String -> CodeGen ()
 putLabel l = putCode $ l ++ ":\n"
 
+-- return the next unused register and increase the counter
 nextRegister :: CodeGen String
 nextRegister = do
     st <- getState
@@ -83,10 +102,13 @@ nextRegister = do
         then error "number of registers exceeds 1023"
         else return $ "r" ++ (show reg)
 
+-- reset register counter to given number,
+-- the next call to nextRegister will return that number
 resetRegisterCounter :: Int -> CodeGen ()
 resetRegisterCounter c =
     CodeGen (\st -> ((), st { regCounter = c }))
 
+-- put a new procedure into procedures table
 putProcedure :: String -> [(Bool, ASTTypeDenoter)] -> CodeGen ()
 putProcedure id params = CodeGen (\st ->
     let procs = if Map.member id (procedures st)
@@ -95,13 +117,14 @@ putProcedure id params = CodeGen (\st ->
         ((), st { procedures = procs })
     )
 
--- return nth of paramter in given procedure
+-- return nth of paramter in given procedure by looking up
+-- the procedures table
 getProcedureParameter :: String -> Int -> CodeGen (Bool, ASTTypeDenoter)
 getProcedureParameter id n = do
     st <- getState
     return $ (procedures st) ! id !! n
 
-
+-- put a new variable into variables table
 putVariable :: Bool -> String -> ASTTypeDenoter -> CodeGen ()
 putVariable isVar id typ = CodeGen (\st ->
     let sc = slotCounter st
@@ -112,6 +135,7 @@ putVariable isVar id typ = CodeGen (\st ->
         ((), st { variables = vars, slotCounter = sc + n })
     )
 
+-- get a variable definition from the variables table
 getVariable :: ASTIdentifier -> CodeGen (Bool, ASTTypeDenoter, Int)
 getVariable id = do
     st <- getState
@@ -119,6 +143,7 @@ getVariable id = do
         Nothing -> error $ "undefined variable or parameter " ++ id
         Just v  -> return v
 
+-- remove all items in the variables table
 clearVariables :: CodeGen ()
 clearVariables =
     CodeGen (\st -> ((), st { variables = Map.empty }))
@@ -127,7 +152,7 @@ clearVariables =
 putCode :: String -> CodeGen ()
 putCode c = CodeGen (\st -> ((), st { code = (code st) ++ c }))
 
--- get code string from state & clear code.
+-- get code string from state & clear code
 getCode :: CodeGen String
 getCode = do
     st <- getState
@@ -142,6 +167,7 @@ putOp op args =
     where gen (a:[]) = a
           gen (a:b:xs) = a ++ ", " ++ (gen $ b:xs)
 
+-- put comment into code
 putComment :: String -> CodeGen ()
 putComment s = putCode $ "# " ++ s ++ "\n"
 
@@ -156,6 +182,7 @@ typeSizeOf (ArrayTypeDenoter ((lo, hi), _)) =
         else error $ "expected m <= n in array[m..n], found "
                      +++ hi ++ " and " +++ lo
 
+-- get type (integer/real/boolean) from variable or array
 primitiveType :: ASTTypeDenoter -> ASTTypeIdentifier
 primitiveType (OrdinaryTypeDenoter t) = t
 primitiveType (ArrayTypeDenoter (_, t)) = t
@@ -200,10 +227,8 @@ compileProgram (name, varDecls, procDecls, bodyStatement) =
             show slot ++
             "\n    return\n"
 
--- the following pre-compilation functions are intended as an example of
--- how you can walk through the AST gathering information into a symbol
--- table (by adding additional state such as the label or slot number and
--- changing the return type, you can easily modify this to compile things)
+-- pre-compilation section
+-- walk through the AST to generate procedures table
 precompileProcedureDeclarationPart ::
     ASTProcedureDeclarationPart -> CodeGen ()
 precompileProcedureDeclarationPart [] = return ()
@@ -230,13 +255,10 @@ precompileFormalParameterSection (isVar, (x : xs), typeDenoter) =
     (isVar, typeDenoter) :
         precompileFormalParameterSection (isVar, xs, typeDenoter)
 
--- the following is code that you have to implement
--- we've provided signatures and comments corresponding to the calls made
--- above, there is no requirement that you follow these signatures at all!
 
 -- compile a list of variable declarations
--- takes a slot number, a symbol table and an AST fragment
--- returns the advanced slot number and the updated symbol table
+-- takes the AST fragment, update variables table,
+-- returns the advanced slot number
 compileVariableDeclarationPart :: ASTVariableDeclarationPart -> CodeGen Int
 compileVariableDeclarationPart [] = do
     st <- getState
@@ -252,8 +274,8 @@ compileVariableDeclaration ((id:ids), typ) = do
     compileVariableDeclaration (ids, typ)
 
 -- compile a list of procedures
--- takes a label number, a symbol table and an AST fragment
--- returns the advanced label number and the generated code
+-- takes the AST fragment, generates code of these procedures
+-- returns the advanced slot number
 compileProcedureDeclarationPart :: ASTProcedureDeclarationPart -> CodeGen Int
 compileProcedureDeclarationPart [] = do
     st <- getState
@@ -262,6 +284,7 @@ compileProcedureDeclarationPart (x:xs) = do
     compileProcedureDeclaration x
     compileProcedureDeclarationPart xs
 
+-- takes one AST of procedure, generates its code
 compileProcedureDeclaration :: ASTProcedureDeclaration -> CodeGen ()
 compileProcedureDeclaration (id, params, vars, body) = do
     putLabel id
@@ -279,6 +302,8 @@ compileProcedureDeclaration (id, params, vars, body) = do
     clearVariables
     clearSlotCounter
 
+-- takes AST of parameter list, udpates variables table,
+-- and return the advanced slot number
 compileFormalParameterList :: ASTFormalParameterList -> CodeGen Int
 compileFormalParameterList [] = do
     st <- getState
@@ -293,6 +318,8 @@ compileFormalParameterSection (isVar, (id:ids), typ) = do
     putVariable isVar id typ
     compileFormalParameterSection (isVar, ids, typ)
 
+-- generates code to save paramters from registers to slots
+-- takes the number of remaining and total paramters
 storeProcedureParamters :: Int -> Int -> CodeGen ()
 storeProcedureParamters 0 _ = resetRegisterCounter 0
 storeProcedureParamters left total = do
@@ -301,8 +328,7 @@ storeProcedureParamters left total = do
     storeProcedureParamters (left - 1) total
 
 -- compile a list of statements
--- takes a label number, a symbol table and an AST fragment
--- returns the advanced label number and the generated code
+-- takes an AST fragment, updates generated code
 compileCompoundStatement :: ASTCompoundStatement -> CodeGen ()
 compileCompoundStatement [] = return ()
 compileCompoundStatement (x : xs) = do
@@ -326,7 +352,7 @@ compileStatement (CompoundStatement s)    = do
     compileCompoundStatement s
     putComment "end"
 
--- compile write statement
+-- compile write statements
 
 compileWriteStringStatement :: ASTWriteStringStatement -> CodeGen ()
 compileWriteStringStatement str = do
@@ -397,6 +423,7 @@ compileWhileStatement (expr, stat) = do
     putLabel labelEnd
 
 -- compile for statement
+-- convert into a while statement before compile
 compileForStatement :: ASTForStatement -> CodeGen ()
 compileForStatement (i, initExpr, dir, endExpr, stat) = do
     putComment "for"
@@ -439,6 +466,7 @@ compileProcedureStatement (id, params) = do
             else compileActualParameterList id 0 params
     putOp "call" [id]
 
+-- evaluate and move parameters to registers
 compileActualParameterList :: String -> Int ->
     ASTActualParameterList -> CodeGen ()
 compileActualParameterList _ _ [] = return ()
@@ -480,6 +508,7 @@ compileAssignmentStatement (var, expr) = do
     storeVariable var rvalue
 
 -- opeartions about variable access
+
 variableType :: ASTVariableAccess -> CodeGen ASTTypeIdentifier
 variableType (IndexedVariable (id, _)) = variableType (Identifier id)
 variableType (Identifier id) = do
@@ -540,6 +569,7 @@ loadAddress reg (IndexedVariable (id, expr)) = do
         else putOp "load_address" [reg, show slot]
     putOp "sub_offset" [reg, reg, index]
 
+-- compile expression
 -- return register where the result of expression, with its type.
 compileExpression :: ASTExpression -> CodeGen (String, ASTTypeIdentifier)
 -- const access
