@@ -1,0 +1,30 @@
+Provide 8 integers: h=2 x[h]=9
+j=1 x[j+1]:=9
+h=3 x[h]=1
+j=2 x[j]=9
+j=1 x[j]=5
+j=0 x[j+1]:=1
+h=4 x[h]=0
+j=3 x[j]=9
+j=2 x[j]=5
+j=1 x[j]=1
+j=0 x[j+1]:=0
+h=5 x[h]=2
+j=4 x[j]=9
+j=3 x[j]=5
+j=2 x[j+1]:=2
+h=6 x[h]=8
+j=5 x[j]=9
+j=4 x[j+1]:=8
+h=7 x[h]=100
+j=6 x[j+1]:=100
+h=8 x[h]=2
+j=7 x[j]=100
+j=6 x[j]=9
+j=5 x[j]=8
+j=4 x[j]=5
+j=3 x[j+1]:=2
+
+The integers, sorted:
+
+0  1  2  2  5  8  9  100  
